@@ -29,29 +29,21 @@ public class MockIMAKnowledgeBaseConnector implements IMAKnowledgeBaseConnector 
     }
 
     @Override
-    public SearchResult search(String kbId, String query, SearchOptions options) {
+    public List<SearchResult> search(String kbId, String query, SearchOptions options) {
         log.info("[Mock] Searching kbId={}, query={}, topK={}, minScore={}, purpose={}",
                 kbId, query, options.topK(), options.minScore(), options.purpose());
-
-        // 返回模拟检索结果
-        String mockDocId = "mock-" + UUID.randomUUID().toString().substring(0, 8);
-        return new SearchResult(
-                mockDocId,
-                "Mock Document: " + query,
-                "This is a mock search result for query: " + query + ". "
-                        + "It simulates the response from IMA knowledge base " + kbId + ". "
-                        + "Replace with real IMA MCP integration when available.",
-                0.92,
-                kbId,
-                Instant.now()
-        );
-    }
-
-    @Override
-    public List<SearchResult> search(String kbId, String query, SearchOptions options) {
         // 返回多条模拟结果
         return List.of(
-                search(kbId, query, options),
+                new SearchResult(
+                        "mock-" + UUID.randomUUID().toString().substring(0, 8),
+                        "Mock Document: " + query,
+                        "This is a mock search result for query: " + query + ". "
+                                + "It simulates the response from IMA knowledge base " + kbId + ". "
+                                + "Replace with real IMA MCP integration when available.",
+                        0.92,
+                        kbId,
+                        Instant.now()
+                ),
                 new SearchResult(
                         "mock-" + UUID.randomUUID().toString().substring(0, 8),
                         "SuperMap GIS Product Overview",

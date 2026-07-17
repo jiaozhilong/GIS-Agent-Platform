@@ -53,3 +53,38 @@ export const imaApi = {
   deleteConfig: (id: number) => apiClient.delete(`/ima/configs/${id}`),
   testConfig: (id: number) => apiClient.post(`/ima/configs/${id}/test`),
 };
+
+// ===== Project & Pipeline API =====
+export const projectApi = {
+  // 创建项目 + 上传需求文档
+  create: (formData: FormData) =>
+    apiClient.post('/projects', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+
+  // 启动流水线
+  run: (id: number) => apiClient.post(`/projects/${id}/run`),
+
+  // 查询流水线状态
+  status: (id: number) => apiClient.get(`/projects/${id}/status`),
+
+  // 下载 Markdown
+  downloadMd: (id: number) =>
+    apiClient.get(`/projects/${id}/download/md`, { responseType: 'blob' }),
+
+  // 下载 Word
+  downloadDocx: (id: number) =>
+    apiClient.get(`/projects/${id}/download/docx`, { responseType: 'blob' }),
+};
+
+// 触发浏览器下载 blob
+export function downloadBlob(blob: Blob, fileName: string) {
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.URL.revokeObjectURL(url);
+}

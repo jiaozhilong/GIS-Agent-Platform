@@ -105,11 +105,14 @@ ima.mock-enabled: true
 - [x] 用户注册/登录（JWT）
 - [x] LLM Provider 管理（添加/测试/删除）
 - [x] IMA 知识库配置（连接/用途标注/权重）
-- [ ] 需求文档上传（PDF/Word/TXT）
-- [ ] 需求分析 Tool（LLM 提取结构化需求）
-- [ ] 产品匹配 Tool（IMA 检索 + LLM 推荐）
-- [ ] Pipeline 引擎（固定顺序执行）
-- [ ] Word + Markdown 方案导出
+- [x] 需求文档上传（PDF/Word/TXT 解析）
+- [x] 需求分析 Tool（LLM 提取结构化需求）
+- [x] 产品匹配 Tool（IMA 检索 + LLM 推荐）
+- [x] Pipeline 引擎（固定顺序执行 + 状态机）
+- [x] Word + Markdown 方案导出
+- [x] 前端流程接入（上传→运行→轮询状态→下载）
+
+> Phase 1 后端已通过 Maven 编译，前端已通过 Vite 构建。运行需本地 PostgreSQL 14 + 配置 LLM Provider。
 
 ## 📖 文档
 

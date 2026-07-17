@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, Upload, Button, Radio, Typography, App, Space, Steps } from 'antd';
 import { InboxOutlined, ThunderboltOutlined, BuildOutlined } from '@ant-design/icons';
 import type { UploadProps } from 'antd';
+import { projectApi } from '../api/client';
 
 const { Title, Text, Paragraph } = Typography;
 const { Dragger } = Upload;
@@ -30,8 +31,9 @@ export default function ProjectCreatePage() {
   const [template, setTemplate] = useState('quick_selection');
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
+  const [name, setName] = useState('');
   const navigate = useNavigate();
-  const { message } = App.useApp();
+  const { message: msg } = App.useApp();
 
   const uploadProps: UploadProps = {
     name: 'file',
@@ -43,27 +45,40 @@ export default function ProjectCreatePage() {
         || file.name.endsWith('.doc')
         || file.type === 'text/plain';
       if (!isValid) {
-        message.error('仅支持 PDF、Word、TXT 格式');
+        msg.error('仅支持 PDF、Word、TXT 格式');
         return Upload.LIST_IGNORE;
       }
       setUploadedFile(file);
-      return false; // 阻止自动上传
+      if (!name) setName(file.name.replace(/\.[^.]+$/, ''));
+      return false;
     },
     onRemove: () => setUploadedFile(null),
   };
 
   const handleStart = async () => {
     if (!uploadedFile) {
-      message.warning('请先上传需求文档');
+      msg.warning('请先上传需求文档');
+      return;
+    }
+    if (!name.trim()) {
+      msg.warning('请输入方案名称');
       return;
     }
     setLoading(true);
-    // TODO: 调用后端 API 创建项目并启动流水线
-    // 目前先跳转到运行页面（后续接入真实 API）
-    setTimeout(() => {
+    try {
+      const formData = new FormData();
+      formData.append('name', name.trim());
+      formData.append('description', '');
+      formData.append('templateId', template);
+      formData.append('file', uploadedFile);
+      const { data } = await projectApi.create(formData);
+      msg.success('项目创建成功，正在启动方案生成...');
+      navigate(`/projects/${data.id}/run`);
+    } catch (err: any) {
+      msg.error(err.response?.data?.error || '创建失败，请检查后端服务是否启动');
+    } finally {
       setLoading(false);
-      navigate('/projects/1/run');
-    }, 500);
+    }
   };
 
   return (
@@ -73,7 +88,6 @@ export default function ProjectCreatePage() {
         上传客户需求文档，选择执行模式，平台将自动生成方案初稿。
       </Paragraph>
 
-      {/* 步骤指示 */}
       <Steps
         current={0}
         size="small"
@@ -85,7 +99,6 @@ export default function ProjectCreatePage() {
         ]}
       />
 
-      {/* 上传区域 */}
       <Card title="📄 上传需求文档" style={{ marginBottom: 24 }}>
         <Dragger {...uploadProps}>
           <p className="ant-upload-drag-icon">
@@ -98,7 +111,18 @@ export default function ProjectCreatePage() {
         </Dragger>
       </Card>
 
-      {/* 模板选择 */}
+      <Card title="📝 方案名称" style={{ marginBottom: 24 }}>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="如：XX市智慧城市 GIS 解决方案"
+          style={{
+            width: '100%', padding: '8px 12px', borderRadius: 6,
+            border: '1px solid #d9d9d9', fontSize: 14,
+          }}
+        />
+      </Card>
+
       <Card title="📋 选择执行模式" style={{ marginBottom: 24 }}>
         <Radio.Group
           value={template}
@@ -134,7 +158,6 @@ export default function ProjectCreatePage() {
         </Radio.Group>
       </Card>
 
-      {/* 开始按钮 */}
       <Button
         type="primary"
         size="large"
