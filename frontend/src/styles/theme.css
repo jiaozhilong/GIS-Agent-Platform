@@ -144,6 +144,16 @@ button { cursor: pointer; border: none; background: none; }
   background: rgba(255, 140, 124, .12);
 }
 
+.btn-ghost {
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid transparent;
+}
+.btn-ghost:hover:not(:disabled) {
+  background: rgba(146, 246, 190, .08);
+  border-color: rgba(146, 246, 190, .2);
+}
+
 .btn-sm { min-height: 36px; padding: 0 14px; font-size: 12px; border-radius: var(--radius-xs); }
 .btn-block { width: 100%; }
 

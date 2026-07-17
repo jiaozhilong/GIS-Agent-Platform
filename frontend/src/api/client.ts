@@ -56,13 +56,18 @@ export const imaApi = {
   testConfig: (id: number) => apiClient.post(`/ima/configs/${id}/test`),
 };
 
-// ===== Template (预置流程模板) API =====
+// ===== Template (流程模板) API =====
 export const templateApi = {
   // 模板列表，可选 category 过滤（official/community/mine）
   list: (category?: string) =>
     apiClient.get('/templates', { params: category ? { category } : {} }),
   // 模板详情
   getByKey: (key: string) => apiClient.get(`/templates/${key}`),
+  // 保存自定义模板（名称 + 工具链）
+  create: (data: { name: string; description?: string; toolChain: string[]; estimatedTime?: string }) =>
+    apiClient.post('/templates', data),
+  // 删除自定义模板（仅 mine）
+  remove: (key: string) => apiClient.delete(`/templates/${key}`),
 };
 
 // ===== Project & Pipeline API =====

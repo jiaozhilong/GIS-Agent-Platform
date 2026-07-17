@@ -21,8 +21,16 @@
 | `/projects/:id/run` | 运行监控（工具进度 + 下载） | `projectApi.run/status/download*` |
 | `/settings/llm` | 大模型配置（Provider 卡片 + 测试/删除） | `llmApi.*` |
 | `/settings/ima` | IMA 知识库（卡片 + 权重滑块 + 启停 + 编辑） | `imaApi.*` |
-| `/pipeline` | 流程编排（节点画布 + 属性面板 + 模板切换） | 前端编排（运行在详情/监控页触发真实流水线） |
-| `/templates` | 模板市场（分类 Tab + 网格卡片 + 工具链节点流 + 使用/预览） | `templateApi.list` → `GET /api/templates`（真实 5 套预置模板，工具链节点数 2/8/5/4/4） |
+| `/pipeline` | 流程编排（**可编辑画布** + 属性面板 + 模板切换 + **保存为自定义模板**） | `templateApi.list` + `templateApi.create` + `templateApi.remove`；编辑态下可增删/排序工具节点，保存为 `category=mine` 模板 |
+| `/templates` | 模板市场（分类 Tab + 网格卡片 + 工具链节点流 + 使用/预览） | `templateApi.list` → `GET /api/templates`（真实 5 套预置模板，工具链节点数 2/8/5/4/4；自定义模板 `category=mine` 同接口可查） |
+
+## Phase 3 进展（智能化增强）
+
+### ✅ P3-2 自定义模板保存 / 复用（2026-07-17）
+- **后端**：`PipelineTemplateController` 新增 `POST /api/templates`（保存自定义模板，自动生成 `mine_<uuid>` 键、`category=mine`、`builtin=false`，校验名称非空与工具类型合法）与 `DELETE /api/templates/{key}`（仅允许删 `mine` 模板，防误删内置）。新增 `TemplateSaveRequest` DTO。
+- **前端**：`PipelinePage` 增加编辑模式（左侧工具链编辑器增删/上下移节点，画布实时预览）、保存模态（名称+说明+工具链预览）、模板分类 Tab（全部/内置/我的）、自定义模板删除按钮；`client.ts` 增加 `templateApi.create/remove`。
+- **验证**：API 级（保存 201 / 校验 400 / 删除 200）+ 无头 UI 链路（登录→编辑→加节点→保存→「我的」出现→用此模板新建方案）全绿，0 控制台错误。自定义模板经 `PipelineEngine.resolveTools(templateKey)` 可被真实 `run` 执行。
+- **未做（后续 P3 项）**：P3-1 知识库自动感知、P3-3 中间产物编辑重跑、P3-4 方案质检增强、P3-5 案例/竞品增强、P3-6 联调验收。
 
 ## 验证结果
 - `npm run build`：tsc 严格模式 + vite 构建通过

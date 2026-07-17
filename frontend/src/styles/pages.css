@@ -356,6 +356,80 @@
 .tpl-meta { font-size: 11px; color: var(--muted-2); }
 .tpl-desc { font-size: 12px; color: var(--muted); line-height: 1.7; }
 
+/* 模板分类 Tab */
+.tpl-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+.tpl-tab {
+  flex: 1; padding: 7px 0; font-size: 12px; font-weight: 650;
+  color: var(--muted-2); background: rgba(255, 255, 255, .02);
+  border: 1px solid var(--line); border-radius: 9px; cursor: pointer; transition: .2s ease;
+}
+.tpl-tab:hover { border-color: var(--line-strong); color: var(--text); }
+.tpl-tab.active { color: var(--mint); border-color: var(--mint); background: rgba(146, 246, 190, .08); }
+
+/* 模板项（含删除按钮） */
+.tpl-item-wrap { display: flex; align-items: stretch; gap: 6px; }
+.tpl-item-wrap .tpl-item { flex: 1; }
+.tpl-del {
+  display: grid; place-items: center; width: 36px; flex-shrink: 0;
+  border: 1px solid var(--line); border-radius: 10px; background: rgba(255, 255, 255, .02);
+  color: var(--muted-2); cursor: pointer; transition: .2s ease;
+}
+.tpl-del:hover { color: var(--danger); border-color: rgba(255, 140, 124, .3); background: rgba(255, 140, 124, .08); }
+.tpl-del svg { width: 15px; height: 15px; }
+
+/* 编辑徽标 */
+.edit-badge {
+  margin-left: 8px; padding: 2px 9px; font-size: 11px; font-weight: 680;
+  color: var(--cyan); background: rgba(94, 230, 225, .12);
+  border: 1px solid rgba(94, 230, 225, .28); border-radius: 999px;
+}
+
+/* 编辑面板：工具链编辑器 */
+.edit-panel { border-color: rgba(94, 230, 225, .22); }
+.chain-editor { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; max-height: 320px; overflow-y: auto; }
+.chain-row {
+  display: flex; align-items: center; gap: 8px; padding: 7px 10px;
+  border: 1px solid var(--line); border-radius: 9px; background: rgba(255, 255, 255, .025);
+}
+.chain-idx {
+  width: 20px; height: 20px; flex-shrink: 0; display: grid; place-items: center;
+  font-size: 11px; font-weight: 700; color: var(--bg); background: var(--accent);
+  border-radius: 6px;
+}
+.chain-label { flex: 1; font-size: 12px; font-weight: 620; }
+.chain-ops { display: flex; gap: 4px; }
+.chain-op {
+  width: 26px; height: 26px; display: grid; place-items: center;
+  border: 1px solid var(--line); border-radius: 7px; background: rgba(255, 255, 255, .03);
+  color: var(--muted); cursor: pointer; font-size: 13px; line-height: 1; transition: .2s ease;
+}
+.chain-op:hover:not(:disabled) { border-color: var(--line-strong); color: var(--text); }
+.chain-op:disabled { opacity: .35; cursor: not-allowed; }
+.chain-op.danger { color: var(--danger); border-color: rgba(255, 140, 124, .2); }
+.chain-op.danger:hover { background: rgba(255, 140, 124, .12); }
+.chain-op svg { width: 13px; height: 13px; }
+
+/* 工具类型文字色（与节点配色一致） */
+.rf-text-mint { color: var(--mint); }
+.rf-text-cyan { color: var(--cyan); }
+.rf-text-amber { color: var(--amber); }
+.rf-text-purple { color: var(--purple); }
+
+/* 添加工具行 */
+.add-tool { display: flex; gap: 6px; }
+.add-tool select { flex: 1; min-height: 36px; }
+.add-tool .btn { min-height: 36px; }
+
+/* 属性面板编辑操作 */
+.prop-ops { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* 保存模态：工具链预览 */
+.save-chain-preview {
+  margin-top: 14px; padding: 12px 14px; font-size: 12px; line-height: 1.7;
+  color: var(--muted); background: rgba(255, 255, 255, .03);
+  border: 1px dashed var(--line-strong); border-radius: 10px;
+}
+
 .canvas-title { font-size: 14px; font-weight: 700; color: var(--text); padding-left: 4px; }
 .prop-desc { font-size: 12px; color: var(--muted); line-height: 1.7; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255, 255, 255, .02); }
 
