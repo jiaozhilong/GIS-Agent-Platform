@@ -16,8 +16,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 流水线引擎（MVP 简化版）。
- * 固定顺序执行：Tool-1 需求分析 → Tool-3 产品匹配。
+ * 流水线引擎（Phase 2 扩展版）。
+ * 模板化工具链执行：quick_selection = 需求分析 → 产品匹配；
+ * full_solution = 需求分析 → 产品匹配 → 案例推荐(T2) → 竞品对比(T4)（T5~T9 后续追加）。
  * 使用状态机管理执行状态，通过 Context Bus 传递数据。
  */
 @Service
@@ -26,6 +27,12 @@ public class PipelineEngine {
 
     private final RequirementAnalysisTool requirementAnalysisTool;
     private final ProductMatchingTool productMatchingTool;
+    private final CaseRecommendTool caseRecommendTool;
+    private final CompetitorTool competitorTool;
+    private final ArchitectureDiagramTool architectureDiagramTool;
+    private final SolutionOutlineTool solutionOutlineTool;
+    private final SolutionQcTool solutionQcTool;
+    private final SolutionOutputTool solutionOutputTool;
     private final PipelineRunRepository pipelineRunRepository;
     private final ToolExecutionRepository toolExecutionRepository;
     private final ProjectDocumentRepository projectDocumentRepository;
@@ -45,22 +52,43 @@ public class PipelineEngine {
 
     public PipelineEngine(RequirementAnalysisTool requirementAnalysisTool,
                           ProductMatchingTool productMatchingTool,
+                          CaseRecommendTool caseRecommendTool,
+                          CompetitorTool competitorTool,
+                          ArchitectureDiagramTool architectureDiagramTool,
+                          SolutionOutlineTool solutionOutlineTool,
+                          SolutionQcTool solutionQcTool,
+                          SolutionOutputTool solutionOutputTool,
                           PipelineRunRepository pipelineRunRepository,
                           ToolExecutionRepository toolExecutionRepository,
                           ProjectDocumentRepository projectDocumentRepository,
                           ExportService exportService) {
         this.requirementAnalysisTool = requirementAnalysisTool;
         this.productMatchingTool = productMatchingTool;
+        this.caseRecommendTool = caseRecommendTool;
+        this.competitorTool = competitorTool;
+        this.architectureDiagramTool = architectureDiagramTool;
+        this.solutionOutlineTool = solutionOutlineTool;
+        this.solutionQcTool = solutionQcTool;
+        this.solutionOutputTool = solutionOutputTool;
         this.pipelineRunRepository = pipelineRunRepository;
         this.toolExecutionRepository = toolExecutionRepository;
         this.projectDocumentRepository = projectDocumentRepository;
         this.exportService = exportService;
 
         // 填充模板工具链
+        // 快速选型：需求分析 → 产品匹配
         TEMPLATE_TOOLS.get("quick_selection").add(requirementAnalysisTool);
         TEMPLATE_TOOLS.get("quick_selection").add(productMatchingTool);
+        // 全套方案：需求分析 → 产品匹配 → 案例推荐 → 竞品对比
+        //          → 架构图 → 方案大纲 → 质检 → 方案输出（T9 PPT 在 P2-4 追加）
         TEMPLATE_TOOLS.get("full_solution").add(requirementAnalysisTool);
         TEMPLATE_TOOLS.get("full_solution").add(productMatchingTool);
+        TEMPLATE_TOOLS.get("full_solution").add(caseRecommendTool);
+        TEMPLATE_TOOLS.get("full_solution").add(competitorTool);
+        TEMPLATE_TOOLS.get("full_solution").add(architectureDiagramTool);
+        TEMPLATE_TOOLS.get("full_solution").add(solutionOutlineTool);
+        TEMPLATE_TOOLS.get("full_solution").add(solutionQcTool);
+        TEMPLATE_TOOLS.get("full_solution").add(solutionOutputTool);
     }
 
     /**
@@ -156,6 +184,12 @@ public class PipelineEngine {
     private Object safeOutput(ToolContext context, String toolType) {
         if ("REQUIREMENT_ANALYSIS".equals(toolType)) return context.getRequirements();
         if ("PRODUCT_MATCHING".equals(toolType)) return context.getProductSelection();
+        if ("CASE_RECOMMEND".equals(toolType)) return context.getCaseRecommendations();
+        if ("COMPETITOR_ANALYSIS".equals(toolType)) return context.getCompetitorAnalysis();
+        if ("ARCHITECTURE_DIAGRAM".equals(toolType)) return context.getArchitectureDiagram();
+        if ("SOLUTION_OUTLINE".equals(toolType)) return context.getSolutionOutline();
+        if ("SOLUTION_QC".equals(toolType)) return context.getQualityCheck();
+        if ("SOLUTION_OUTPUT".equals(toolType)) return context.getSolutionText();
         return null;
     }
 

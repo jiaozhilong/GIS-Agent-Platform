@@ -158,6 +158,12 @@ public class PipelineController {
         return download(id, "DOCX", auth);
     }
 
+    /** 下载 PPT（Tool-9 方案输出，导出为后处理，与 MD/DOCX 一致） */
+    @GetMapping("/{id}/download/pptx")
+    public ResponseEntity<?> downloadPptx(@PathVariable Long id, Authentication auth) {
+        return download(id, "PPTX", auth);
+    }
+
     private ResponseEntity<?> download(Long id, String type, Authentication auth) {
         Long userId = (Long) auth.getPrincipal();
         Project project = projectRepository.findById(id)
@@ -176,6 +182,9 @@ public class PipelineController {
         if ("MD".equals(type)) {
             filePath = exportService.exportMarkdown(id, project.getName(), context);
             fileName = new File(filePath).getName();
+        } else if ("PPTX".equals(type)) {
+            filePath = exportService.exportPptx(id, project.getName(), context);
+            fileName = new File(filePath).getName();
         } else {
             filePath = exportService.exportDocx(id, project.getName(), context);
             fileName = new File(filePath).getName();
@@ -193,9 +202,14 @@ public class PipelineController {
 
         try {
             byte[] data = Files.readAllBytes(f.toPath());
-            String contentType = "MD".equals(type)
-                    ? "text/markdown; charset=utf-8"
-                    : "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+            String contentType;
+            if ("MD".equals(type)) {
+                contentType = "text/markdown; charset=utf-8";
+            } else if ("PPTX".equals(type)) {
+                contentType = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+            } else {
+                contentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+            }
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
                     .contentType(MediaType.parseMediaType(contentType))

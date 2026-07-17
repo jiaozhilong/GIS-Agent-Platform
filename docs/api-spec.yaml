@@ -542,3 +542,23 @@ paths:
             text/markdown:
               schema:
                 type: string
+
+  /projects/{id}/download/pptx:
+    get:
+      tags: [导出]
+      summary: 下载 PowerPoint 方案文档（Tool-9 方案输出）
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: .pptx 文件
+          content:
+            application/vnd.openxmlformats-officedocument.presentationml.presentation:
+              schema:
+                type: string
+                format: binary
