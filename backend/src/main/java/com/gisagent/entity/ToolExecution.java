@@ -2,6 +2,8 @@ package com.gisagent.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.time.Instant;
 
 @Entity
@@ -36,9 +38,11 @@ public class ToolExecution {
     @Column(name = "llm_model", length = 128)
     private String llmModel;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "input_json", columnDefinition = "JSONB")
     private String inputJson;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "output_json", columnDefinition = "JSONB")
     private String outputJson;
 

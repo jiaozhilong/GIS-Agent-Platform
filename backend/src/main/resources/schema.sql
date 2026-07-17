@@ -12,3 +12,7 @@ CREATE TABLE IF NOT EXISTS pipeline_templates (
     created_at      TIMESTAMP    NOT NULL,
     updated_at      TIMESTAMP    NOT NULL
 );
+
+-- 兼容字段升级：LlmProvider 新增 model 列（幂等）
+ALTER TABLE llm_providers ADD COLUMN IF NOT EXISTS model VARCHAR(128);
+

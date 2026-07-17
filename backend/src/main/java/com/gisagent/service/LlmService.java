@@ -65,11 +65,6 @@ public class LlmService {
         body.put("temperature", temperature != null ? temperature : 0.3);
         body.put("max_tokens", maxTokens != null ? maxTokens : 2048);
 
-        // 结构化输出（如支持）
-        Map<String, Object> responseFormat = new HashMap<>();
-        responseFormat.put("type", "json_object");
-        body.put("response_format", responseFormat);
-
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
 
         try {
