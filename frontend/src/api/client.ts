@@ -1,7 +1,9 @@
 import axios from 'axios';
 
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE || 'http://localhost:8080/api',
+  // 默认相对路径：开发/预览由 vite proxy 同源转发到后端，避免 CORS。
+  // 生产构建如需直连后端，设置环境变量 VITE_API_BASE=https://your-host/api
+  baseURL: import.meta.env.VITE_API_BASE || '/api',
   timeout: 30000,
   headers: { 'Content-Type': 'application/json' },
 });
@@ -54,8 +56,23 @@ export const imaApi = {
   testConfig: (id: number) => apiClient.post(`/ima/configs/${id}/test`),
 };
 
+// ===== Template (预置流程模板) API =====
+export const templateApi = {
+  // 模板列表，可选 category 过滤（official/community/mine）
+  list: (category?: string) =>
+    apiClient.get('/templates', { params: category ? { category } : {} }),
+  // 模板详情
+  getByKey: (key: string) => apiClient.get(`/templates/${key}`),
+};
+
 // ===== Project & Pipeline API =====
 export const projectApi = {
+  // 项目列表
+  list: () => apiClient.get('/projects'),
+
+  // 项目详情
+  getById: (id: number) => apiClient.get(`/projects/${id}`),
+
   // 创建项目 + 上传需求文档
   create: (formData: FormData) =>
     apiClient.post('/projects', formData, {
@@ -75,6 +92,10 @@ export const projectApi = {
   // 下载 Word
   downloadDocx: (id: number) =>
     apiClient.get(`/projects/${id}/download/docx`, { responseType: 'blob' }),
+
+  // 下载 PPT
+  downloadPptx: (id: number) =>
+    apiClient.get(`/projects/${id}/download/pptx`, { responseType: 'blob' }),
 };
 
 // 触发浏览器下载 blob

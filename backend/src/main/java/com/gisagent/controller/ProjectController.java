@@ -3,8 +3,11 @@ package com.gisagent.controller;
 import com.gisagent.dto.ProjectDto;
 import com.gisagent.entity.Project;
 import com.gisagent.entity.ProjectDocument;
+import com.gisagent.entity.PipelineRun;
 import com.gisagent.repository.ProjectDocumentRepository;
 import com.gisagent.repository.ProjectRepository;
+import com.gisagent.repository.PipelineRunRepository;
+import com.gisagent.repository.ToolExecutionRepository;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
@@ -23,14 +26,20 @@ public class ProjectController {
 
     private final ProjectRepository projectRepository;
     private final ProjectDocumentRepository documentRepository;
+    private final PipelineRunRepository pipelineRunRepository;
+    private final ToolExecutionRepository toolExecutionRepository;
 
     @Value("${storage.upload-dir:./data/uploads}")
     private String uploadDir;
 
     public ProjectController(ProjectRepository projectRepository,
-                             ProjectDocumentRepository documentRepository) {
+                             ProjectDocumentRepository documentRepository,
+                             PipelineRunRepository pipelineRunRepository,
+                             ToolExecutionRepository toolExecutionRepository) {
         this.projectRepository = projectRepository;
         this.documentRepository = documentRepository;
+        this.pipelineRunRepository = pipelineRunRepository;
+        this.toolExecutionRepository = toolExecutionRepository;
     }
 
     @PostMapping
@@ -84,6 +93,50 @@ public class ProjectController {
     public ResponseEntity<?> list(Authentication auth) {
         Long userId = (Long) auth.getPrincipal();
         return ResponseEntity.ok(projectRepository.findByUserId(userId).stream().map(this::toResponse));
+    }
+
+    /** 项目详情：基本信息 + 文档列表 + 最近一次流水线运行 */
+    @GetMapping("/{id}")
+    public ResponseEntity<?> getById(@PathVariable Long id, Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        Project project = projectRepository.findById(id)
+                .filter(p -> p.getUserId().equals(userId))
+                .orElse(null);
+        if (project == null) return ResponseEntity.notFound().build();
+
+        Map<String, Object> result = new java.util.HashMap<>();
+        result.put("id", project.getId());
+        result.put("name", project.getName());
+        result.put("description", project.getDescription());
+        result.put("templateId", project.getTemplateId());
+        result.put("status", project.getStatus());
+        result.put("createdAt", project.getCreatedAt() != null ? project.getCreatedAt().toString() : null);
+
+        result.put("documents", documentRepository.findByProjectId(id).stream().map(d -> {
+            Map<String, Object> m = new java.util.HashMap<>();
+            m.put("id", d.getId());
+            m.put("fileName", d.getFileName());
+            m.put("fileType", d.getFileType());
+            m.put("fileSize", d.getFileSize());
+            return m;
+        }).toList());
+
+        PipelineRun run = pipelineRunRepository.findFirstByProjectIdOrderByIdDesc(id);
+        if (run != null) {
+            Map<String, Object> runMap = new java.util.HashMap<>();
+            runMap.put("id", run.getId());
+            runMap.put("status", run.getStatus());
+            runMap.put("tools", toolExecutionRepository.findByPipelineRunIdOrderByToolOrder(run.getId()).stream().map(t -> {
+                Map<String, Object> m = new java.util.HashMap<>();
+                m.put("toolType", t.getToolType());
+                m.put("status", t.getStatus());
+                m.put("toolOrder", t.getToolOrder());
+                return m;
+            }).toList());
+            result.put("latestRun", runMap);
+        }
+
+        return ResponseEntity.ok(result);
     }
 
     private ProjectDto.ProjectResponse toResponse(Project p) {

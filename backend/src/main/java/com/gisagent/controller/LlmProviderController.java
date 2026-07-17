@@ -53,6 +53,7 @@ public class LlmProviderController {
                 .providerType(request.getProviderType())
                 .endpoint(request.getEndpoint())
                 .apiKeyEncrypted(request.getApiKey()) // TODO: 加密存储
+                .model(request.getModel())
                 .isDefault(request.getIsDefault() != null && request.getIsDefault())
                 .build();
 
@@ -92,6 +93,7 @@ public class LlmProviderController {
         r.setName(p.getName());
         r.setProviderType(p.getProviderType());
         r.setEndpoint(p.getEndpoint());
+        r.setModel(p.getModel());
         r.setIsDefault(p.getIsDefault());
         r.setHasApiKey(p.getApiKeyEncrypted() != null && !p.getApiKeyEncrypted().isEmpty());
         return r;

@@ -1,279 +1,147 @@
-import { useState, useEffect, useRef } from 'react';
-import { useParams } from 'react-router-dom';
-import {
-  Card, Tag, Button, Typography, Spin, Descriptions, Alert, Space, Progress, App
-} from 'antd';
-import {
-  CheckCircleOutlined, SyncOutlined, CloseCircleOutlined, ClockCircleOutlined,
-  DownloadOutlined,
-} from '@ant-design/icons';
+import { useEffect, useRef, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { projectApi, downloadBlob } from '../api/client';
+import { useToast } from '../components/ui/Toast';
+import { IconPlay, IconDownload, IconChevronRight, IconCheck, IconSync, IconClose, IconDoc } from '../components/ui/icons';
+import { effectiveStatus, STATUS_LABEL, type EffStatus } from '../utils/status';
 
-const { Title, Text, Paragraph } = Typography;
+interface ToolStatus { toolType: string; toolOrder: number; status: string; output?: any; errorMessage?: string; }
 
-interface ToolStatus {
-  toolType: string;
-  toolOrder: number;
-  status: 'PENDING' | 'RUNNING' | 'SUCCESS' | 'FAILED' | 'SKIPPED';
-  output?: any;
-  errorMessage?: string;
-}
-
-interface PipelineStatus {
-  pipelineRunId: number;
-  projectId: number;
-  status: string;
-  tools: ToolStatus[];
-  context?: any;
-}
-
-const TOOL_LABELS: Record<string, string> = {
-  REQUIREMENT_ANALYSIS: '需求分析',
-  PRODUCT_MATCHING: '产品匹配',
-  CASE_RECOMMEND: '案例推荐',
-  COMPETITIVE_ANALYSIS: '竞品对比',
-  ARCHITECTURE_DIAGRAM: '架构图生成',
-  SOLUTION_OUTLINE: '方案框架生成',
-  SOLUTION_QC: '方案质检',
-  SOLUTION_OUTPUT: '方案输出',
-  PPT_OUTPUT: 'PPT 输出',
+const TOOL_LABEL: Record<string, string> = {
+  REQUIREMENT_ANALYSIS: '需求分析', PRODUCT_MATCHING: '产品匹配', CASE_RECOMMEND: '案例推荐',
+  COMPETITIVE_ANALYSIS: '竞品对比', ARCHITECTURE_DIAGRAM: '架构图生成', SOLUTION_OUTLINE: '方案框架',
+  SOLUTION_QC: '方案质检', SOLUTION_OUTPUT: '方案输出', PPT_OUTPUT: 'PPT 输出',
 };
+
+function statusBadge(s: string) {
+  switch (s) {
+    case 'SUCCESS': return <span className="badge badge-mint"><IconCheck width={12} height={12} /> 完成</span>;
+    case 'RUNNING': return <span className="badge badge-cyan"><IconSync width={12} height={12} /> 运行中</span>;
+    case 'FAILED': return <span className="badge badge-danger">失败</span>;
+    case 'PENDING': return <span className="badge badge-idle">排队中</span>;
+    default: return <span className="badge badge-idle">等待中</span>;
+  }
+}
 
 export default function PipelineRunPage() {
   const { id } = useParams();
   const projectId = Number(id);
-  const [status, setStatus] = useState<PipelineStatus | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [docReady, setDocReady] = useState(false);
-  const { message } = App.useApp();
-  const pollTimer = useRef<number | null>(null);
+  const navigate = useNavigate();
+  const { showToast } = useToast();
 
-  // 启动流水线 + 轮询状态
+  const [status, setStatus] = useState<string>('NO_RUN');
+  const [tools, setTools] = useState<ToolStatus[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [running, setRunning] = useState(false);
+  const pollRef = useRef<number | null>(null);
+
+  const poll = async () => {
+    try {
+      const { data } = await projectApi.status(projectId);
+      if (data.status === 'NO_RUN') { setStatus('NO_RUN'); return; }
+      setStatus(data.status);
+      setTools(data.tools || []);
+      if (['SUCCESS', 'PARTIAL', 'FAILED'].includes(data.status)) {
+        setRunning(false);
+        if (pollRef.current) window.clearInterval(pollRef.current);
+      }
+    } catch { /* ignore */ }
+  };
+
   useEffect(() => {
     let cancelled = false;
-
-    const startAndPoll = async () => {
+    (async () => {
       try {
-        // 先检查是否已有运行记录
         const { data: existing } = await projectApi.status(projectId);
-        if (existing.status === 'NO_RUN') {
-          await projectApi.run(projectId);
-        }
-        if (cancelled) return;
-        poll();
-      } catch (err: any) {
-        message.error(err.response?.data?.error || '启动流水线失败');
-        setLoading(false);
+        if (existing.status === 'NO_RUN') { await projectApi.run(projectId); }
+        if (!cancelled) { setLoading(false); poll(); pollRef.current = window.setInterval(poll, 3000); }
+      } catch (e: any) {
+        if (!cancelled) { setLoading(false); showToast(e.response?.data?.error || '启动流水线失败', true); }
       }
-    };
-
-    const poll = async () => {
-      try {
-        const { data } = await projectApi.status(projectId);
-        if (cancelled) return;
-        setStatus(data);
-        setLoading(false);
-        if (data.status === 'SUCCESS' || data.status === 'PARTIAL' || data.status === 'FAILED') {
-          if (data.status === 'SUCCESS' || data.status === 'PARTIAL') {
-            setDocReady(true);
-          }
-          if (pollTimer.current) window.clearInterval(pollTimer.current);
-        }
-      } catch {
-        if (cancelled) return;
-        setLoading(false);
-      }
-    };
-
-    startAndPoll();
-    pollTimer.current = window.setInterval(poll, 3000);
-
-    return () => {
-      cancelled = true;
-      if (pollTimer.current) window.clearInterval(pollTimer.current);
-    };
+    })();
+    return () => { cancelled = true; if (pollRef.current) window.clearInterval(pollRef.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
-  const getStatusIcon = (s: string) => {
-    switch (s) {
-      case 'SUCCESS': return <CheckCircleOutlined style={{ color: '#52c41a' }} />;
-      case 'RUNNING': return <SyncOutlined spin style={{ color: '#1890ff' }} />;
-      case 'FAILED': return <CloseCircleOutlined style={{ color: '#ff4d4f' }} />;
-      default: return <ClockCircleOutlined style={{ color: '#d9d9d9' }} />;
-    }
+  const handleRun = async () => {
+    setRunning(true);
+    try { await projectApi.run(projectId); showToast('流水线已重新启动'); poll(); pollRef.current = window.setInterval(poll, 3000); }
+    catch (e: any) { setRunning(false); showToast(e.response?.data?.error || '启动失败', true); }
   };
 
-  const getStatusTag = (s: string) => {
-    switch (s) {
-      case 'SUCCESS': return <Tag color="success">完成</Tag>;
-      case 'RUNNING': return <Tag color="processing">运行中</Tag>;
-      case 'FAILED': return <Tag color="error">失败</Tag>;
-      case 'SKIPPED': return <Tag>跳过</Tag>;
-      default: return <Tag>等待中</Tag>;
-    }
-  };
-
-  const handleDownload = async (type: 'md' | 'docx') => {
+  const handleDownload = async (type: 'md' | 'docx' | 'pptx') => {
     try {
-      const { data } = type === 'md'
-        ? await projectApi.downloadMd(projectId)
-        : await projectApi.downloadDocx(projectId);
-      const fileName = type === 'md' ? `solution_${projectId}.md` : `solution_${projectId}.docx`;
-      downloadBlob(data, fileName);
-      message.success('下载成功');
-    } catch (err: any) {
-      message.error(err.response?.data?.error || '下载失败');
-    }
+      const { data } = type === 'md' ? await projectApi.downloadMd(projectId)
+        : type === 'docx' ? await projectApi.downloadDocx(projectId)
+        : await projectApi.downloadPptx(projectId);
+      const ext = type === 'md' ? 'md' : type === 'docx' ? 'docx' : 'pptx';
+      downloadBlob(data, `solution_${projectId}.${ext}`);
+      showToast('下载已开始');
+    } catch (e: any) { showToast(e.response?.data?.error || '下载失败', true); }
   };
 
-  if (loading && !status) {
-    return (
-      <div style={{ textAlign: 'center', padding: 80 }}>
-        <Spin size="large" />
-        <Paragraph style={{ marginTop: 16 }}>正在初始化流水线...</Paragraph>
-      </div>
-    );
+  if (loading) {
+    return <div className="empty-state"><p>正在初始化流水线…</p></div>;
   }
 
-  const tools = status?.tools || [];
-  const finishedCount = tools.filter((t) => t.status === 'SUCCESS' || t.status === 'FAILED').length;
-  const progress = tools.length > 0 ? Math.round((finishedCount / tools.length) * 100) : 0;
-  const isDone = status?.status === 'SUCCESS' || status?.status === 'PARTIAL';
+  const done = ['SUCCESS', 'PARTIAL'].includes(status);
+  const failed = status === 'FAILED';
+  const finished = tools.filter((t) => t.status === 'SUCCESS' || t.status === 'FAILED').length;
+  const progress = tools.length ? Math.round((finished / tools.length) * 100) : 0;
+  const es: EffStatus = effectiveStatus(undefined, status === 'NO_RUN' ? undefined : status);
 
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+    <div style={{ maxWidth: 920, margin: '0 auto' }}>
+      <div className="flex-between" style={{ marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <Title level={3} style={{ margin: 0 }}>方案生成中</Title>
-          <Text type="secondary">项目 ID：{projectId}</Text>
+          <h1 style={{ fontSize: 26, fontWeight: 760, letterSpacing: '-.03em' }}>方案生成监控</h1>
+          <p style={{ fontSize: 13, color: 'var(--muted)' }}>项目 ID：{projectId}</p>
         </div>
-        <Space>
-          <Progress type="circle" percent={progress} size={48} />
-          {(status?.status === 'RUNNING' || status?.status === 'PENDING') && (
-            <Tag color="processing" icon={<SyncOutlined spin />}>运行中</Tag>
-          )}
-          {status?.status === 'FAILED' && <Tag color="error">失败</Tag>}
-          {isDone && <Tag color="success">已完成</Tag>}
-        </Space>
+        <div className="flex gap-3" style={{ alignItems: 'center' }}>
+          <span style={{ fontSize: 28, fontWeight: 760, color: 'var(--mint)' }}>{progress}%</span>
+          <span className={`status-badge ${es}`}>{STATUS_LABEL[es]}</span>
+          <button className="btn btn-secondary btn-sm" onClick={() => navigate(`/projects/${projectId}`)}><IconChevronRight /> 返回详情</button>
+        </div>
       </div>
 
-      {/* 工具执行流水线 */}
-      <div style={{ display: 'flex', gap: 16, marginBottom: 24, flexWrap: 'wrap' }}>
-        {tools.map((tool) => (
-          <Card
-            key={tool.toolOrder}
-            size="small"
-            style={{
-              flex: '1 1 200px',
-              textAlign: 'center',
-              borderColor: tool.status === 'RUNNING' ? '#1890ff' : undefined,
-            }}
-            title={
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                {getStatusIcon(tool.status)}
-                <span>{TOOL_LABELS[tool.toolType] || tool.toolType}</span>
-              </div>
-            }
-          >
-            {getStatusTag(tool.status)}
-            {tool.status === 'RUNNING' && (
-              <div style={{ marginTop: 8 }}><Spin size="small" /></div>
-            )}
-            {tool.status === 'FAILED' && tool.errorMessage && (
-              <Paragraph type="danger" style={{ marginTop: 8, fontSize: 12 }}>
-                {tool.errorMessage}
-              </Paragraph>
-            )}
-          </Card>
-        ))}
-        {tools.length === 0 && (
-          <Alert message="等待流水线启动..." type="info" showIcon />
-        )}
-      </div>
-
-      {/* 中间产物展示 */}
-      <Card title="📋 中间产物" style={{ marginBottom: 24 }}>
-        {tools.filter((t) => t.output).map((tool) => (
-          <div key={tool.toolOrder} style={{ marginBottom: 24 }}>
-            <Title level={5}>
-              {getStatusIcon(tool.status)} {TOOL_LABELS[tool.toolType] || tool.toolType} 输出
-            </Title>
-            {tool.toolType === 'REQUIREMENT_ANALYSIS' && tool.output && (
-              <Descriptions bordered size="small" column={2}>
-                <Descriptions.Item label="功能需求" span={2}>
-                  {(tool.output.functional || []).map((f: string, i: number) => (
-                    <Tag key={i} color="blue" style={{ marginBottom: 4 }}>{f}</Tag>
-                  ))}
-                </Descriptions.Item>
-                <Descriptions.Item label="非功能需求" span={2}>
-                  {(tool.output.nonFunctional || []).map((n: string, i: number) => (
-                    <Tag key={i} color="green" style={{ marginBottom: 4 }}>{n}</Tag>
-                  ))}
-                </Descriptions.Item>
-                <Descriptions.Item label="约束条件" span={2}>
-                  {(tool.output.constraints || []).map((c: string, i: number) => (
-                    <Tag key={i} color="orange" style={{ marginBottom: 4 }}>{c}</Tag>
-                  ))}
-                </Descriptions.Item>
-                <Descriptions.Item label="行业场景">
-                  <Tag color="purple">{tool.output.industry}</Tag>
-                </Descriptions.Item>
-              </Descriptions>
-            )}
-            {tool.toolType === 'PRODUCT_MATCHING' && tool.output && (
-              <div>
-                {(tool.output as any[]).map((p, i) => (
-                  <Card key={i} size="small" style={{ marginBottom: 8 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <Text strong>{p.productName}</Text>
-                        <Tag style={{ marginLeft: 8 }}>{p.version}</Tag>
-                      </div>
-                      <Tag color="blue">覆盖率 {p.coverage}</Tag>
-                    </div>
-                    <Paragraph type="secondary" style={{ marginTop: 4, marginBottom: 0 }}>
-                      {p.reason}
-                    </Paragraph>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
-        {tools.filter((t) => t.output).length === 0 && (
-          <Alert message="流水线正在运行中，工具输出将实时展示..." type="info" showIcon />
-        )}
-      </Card>
-
-      {/* 下载区域 */}
-      <Card title="📥 方案下载" style={{ marginBottom: 24 }}>
-        {status?.status === 'FAILED' ? (
-          <Alert message="流水线执行失败，请检查 LLM Provider 配置和 IMA 连接后重试" type="error" showIcon />
+      {/* Tool cards */}
+      <div className="flex gap-4" style={{ marginBottom: 24, flexWrap: 'wrap' }}>
+        {tools.length === 0 ? (
+          <div className="panel" style={{ flex: 1 }}><div className="empty-state"><p>等待流水线启动…</p></div></div>
         ) : (
-          <Space size="middle">
-            <Button
-              type="primary"
-              icon={<DownloadOutlined />}
-              disabled={!docReady}
-              onClick={() => handleDownload('docx')}
-            >
-              下载 Word 方案文档 (.docx)
-            </Button>
-            <Button
-              icon={<DownloadOutlined />}
-              disabled={!docReady}
-              onClick={() => handleDownload('md')}
-            >
-              下载 Markdown (.md)
-            </Button>
-          </Space>
+          tools.map((t) => (
+            <div key={t.toolOrder} className="card" style={{ flex: '1 1 180px', padding: 16, borderColor: t.status === 'RUNNING' ? 'var(--mint)' : 'var(--line)' }}>
+              <div className="flex gap-2" style={{ alignItems: 'center', marginBottom: 8 }}>
+                <span className={`node-icon ${t.status === 'SUCCESS' ? 'mint' : t.status === 'RUNNING' ? 'cyan' : t.status === 'FAILED' ? 'danger' : ''}`}>
+                  {t.status === 'RUNNING' ? <IconSync /> : t.status === 'FAILED' ? <IconClose /> : <IconDoc />}
+                </span>
+                <div style={{ fontWeight: 680, fontSize: 13 }}>{TOOL_LABEL[t.toolType] || t.toolType}</div>
+              </div>
+              {statusBadge(t.status)}
+            </div>
+          ))
         )}
-        {!docReady && isDone && (
-          <Paragraph type="secondary" style={{ marginTop: 8 }}>
-            正在准备下载文件...
-          </Paragraph>
-        )}
-      </Card>
+      </div>
+
+      {/* Downloads */}
+      <div className="panel">
+        <div className="panel-head"><h2>方案下载</h2></div>
+        <div className="panel-body">
+          {failed ? (
+            <div className="badge badge-danger" style={{ padding: 8 }}>流水线执行失败，请检查 LLM Provider 配置与 IMA 连接后重试</div>
+          ) : (
+            <div className="flex gap-3" style={{ flexWrap: 'wrap' }}>
+              <button className="btn btn-primary" onClick={() => handleDownload('docx')} disabled={!done}><IconDownload /> 下载 Word (.docx)</button>
+              <button className="btn btn-secondary" onClick={() => handleDownload('md')} disabled={!done}><IconDownload /> 下载 Markdown (.md)</button>
+              <button className="btn btn-secondary" onClick={() => handleDownload('pptx')} disabled={!done}><IconDownload /> 下载 PPT (.pptx)</button>
+            </div>
+          )}
+          {!done && !failed && <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 12 }}>方案生成完成后即可下载</p>}
+          {!running && status !== 'NO_RUN' && (
+            <button className="btn btn-secondary" style={{ marginTop: 16 }} onClick={handleRun}><IconPlay /> 重新运行</button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

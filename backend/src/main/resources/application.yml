@@ -8,6 +8,9 @@ spring:
     password: ${DB_PASSWORD:gisagent}
     driver-class-name: org.postgresql.Driver
 
+  sql:
+    init:
+      mode: always
   jpa:
     hibernate:
       ddl-auto: validate

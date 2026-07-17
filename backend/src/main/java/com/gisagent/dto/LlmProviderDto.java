@@ -18,6 +18,7 @@ public class LlmProviderDto {
         private String endpoint;
 
         private String apiKey;
+        private String model;
         private Boolean isDefault;
     }
 
@@ -26,6 +27,7 @@ public class LlmProviderDto {
         private String name;
         private String endpoint;
         private String apiKey;
+        private String model;
         private Boolean isDefault;
     }
 
@@ -42,6 +44,7 @@ public class LlmProviderDto {
         private String name;
         private String providerType;
         private String endpoint;
+        private String model;
         private Boolean isDefault;
         private boolean hasApiKey;
     }

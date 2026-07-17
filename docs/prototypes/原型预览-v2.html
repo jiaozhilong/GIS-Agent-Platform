@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIS-Agent 原型预览 v2 · 深浅搭配</title>
+<style>
+  body{margin:0;padding:24px;background:#1f2937;font-family:'HarmonyOS Sans SC','Inter','PingFang SC',system-ui,sans-serif;}
+</style>
+</head>
+<body>
+<div style="font-family:'HarmonyOS Sans SC','Inter','PingFang SC',system-ui,sans-serif;max-width:960px;margin:0 auto;color:#0F1B2D;">
+  <div style="background:linear-gradient(135deg,#0D9488,#F59E0B);padding:16px 24px;border-radius:12px 12px 0 0;color:#fff;display:flex;justify-content:space-between;align-items:center;">
+    <div style="font-weight:700;font-size:18px;">GIS-Agent 原型预览 v2 · 深浅搭配 · 制图工作台</div>
+    <div style="font-size:13px;opacity:.9;">待龙哥确认</div>
+  </div>
+
+  <!-- Screen 1: 登录页 -->
+  <div style="background:#fff;border:1px solid #E3E8EF;border-top:none;border-radius:0 0 8px 8px;overflow:hidden;margin-bottom:24px;">
+    <div style="background:#0E1A2B;padding:6px 12px;display:flex;align-items:center;gap:6px;">
+      <span style="width:10px;height:10px;border-radius:50%;background:#EF4444;"></span><span style="width:10px;height:10px;border-radius:50%;background:#F59E0B;"></span><span style="width:10px;height:10px;border-radius:50%;background:#10B981;"></span>
+      <span style="color:#5A6B82;font-size:11px;margin-left:8px;">登录页 / login</span>
+    </div>
+    <div style="display:flex;min-height:420px;background:radial-gradient(circle at 30% 40%,#16243D 0%,#0E1A2B 70%);position:relative;">
+      <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(13,148,136,0.06) 1px,transparent 1px),linear-gradient(90deg,rgba(13,148,136,0.06) 1px,transparent 1px);background-size:24px 24px;"></div>
+      <div style="flex:1;display:flex;align-items:center;justify-content:center;position:relative;">
+        <svg viewBox="0 0 220 220" width="280" height="280" style="filter:drop-shadow(0 0 30px rgba(13,148,136,0.4));">
+          <defs><radialGradient id="g1" cx="35%" cy="30%"><stop offset="0%" stop-color="#1e3a5f"/><stop offset="100%" stop-color="#0E1A2B"/></radialGradient></defs>
+          <circle cx="110" cy="110" r="86" fill="url(#g1)" stroke="#0D9488" stroke-width="1.2" opacity="0.85"/>
+          <ellipse cx="110" cy="110" rx="86" ry="30" fill="none" stroke="#0D9488" stroke-width="0.8" opacity="0.45"/>
+          <ellipse cx="110" cy="110" rx="86" ry="60" fill="none" stroke="#0D9488" stroke-width="0.8" opacity="0.35"/>
+          <line x1="24" y1="110" x2="196" y2="110" stroke="#0D9488" stroke-width="0.8" opacity="0.5"/>
+          <ellipse cx="110" cy="110" rx="30" ry="86" fill="none" stroke="#0D9488" stroke-width="0.8" opacity="0.4"/>
+          <ellipse cx="110" cy="110" rx="60" ry="86" fill="none" stroke="#0D9488" stroke-width="0.8" opacity="0.3"/>
+          <line x1="110" y1="24" x2="110" y2="196" stroke="#0D9488" stroke-width="0.8" opacity="0.4"/>
+          <path d="M44,78 Q110,32 176,78" fill="none" stroke="#F59E0B" stroke-width="1.8" opacity="0.95"/>
+          <path d="M60,150 Q110,182 162,138" fill="none" stroke="#2DD4BF" stroke-width="1.6" opacity="0.85"/>
+          <circle cx="44" cy="78" r="3.5" fill="#F59E0B"/><circle cx="176" cy="78" r="3.5" fill="#F59E0B"/>
+          <circle cx="60" cy="150" r="3.5" fill="#2DD4BF"/><circle cx="162" cy="138" r="3.5" fill="#2DD4BF"/>
+        </svg>
+        <div style="position:absolute;bottom:28px;left:28px;color:#94A3B8;font-size:12px;">数字孪生 · 三维球（动效：球体缓旋 + 弧线数据流）</div>
+      </div>
+      <div style="width:340px;margin:28px;display:flex;align-items:center;">
+        <div style="width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);border-radius:14px;padding:28px;backdrop-filter:blur(8px);">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;">
+            <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#0D9488,#F59E0B);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;">G</div>
+            <div style="color:#E6EDF6;font-weight:700;font-size:20px;">GIS-Agent</div>
+          </div>
+          <div style="color:#94A3B8;font-size:13px;margin-bottom:20px;">智能 GIS 解决方案生成平台<br>IMA 知识库 + 大模型 · 9 工具流水线</div>
+          <div style="margin-bottom:12px;"><input style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:11px 12px;color:#E6EDF6;font-size:14px;" value="jiaozhilong" /></div>
+          <div style="margin-bottom:20px;"><input style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:11px 12px;color:#E6EDF6;font-size:14px;" type="password" value="········" /></div>
+          <button style="width:100%;background:#0D9488;border:none;color:#fff;font-weight:600;font-size:15px;padding:12px;border-radius:8px;cursor:pointer;">登录</button>
+          <div style="text-align:center;margin-top:16px;"><span style="color:#2DD4BF;font-size:13px;">注册新账号</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Screen 2: 工作台 -->
+  <div style="background:#fff;border:1px solid #E3E8EF;border-radius:8px;overflow:hidden;margin-bottom:24px;">
+    <div style="background:#0E1A2B;padding:6px 12px;display:flex;align-items:center;gap:6px;">
+      <span style="width:10px;height:10px;border-radius:50%;background:#EF4444;"></span><span style="width:10px;height:10px;border-radius:50%;background:#F59E0B;"></span><span style="width:10px;height:10px;border-radius:50%;background:#10B981;"></span>
+      <span style="color:#5A6B82;font-size:11px;margin-left:8px;">工作台 / 项目列表</span>
+    </div>
+    <div style="display:flex;min-height:400px;background:#F4F6FA;">
+      <div style="width:200px;background:#0E1A2B;padding:18px 14px;box-sizing:border-box;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:24px;"><div style="width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,#0D9488,#F59E0B);"></div><span style="color:#E6EDF6;font-weight:700;font-size:15px;">GIS-Agent</span></div>
+        <div style="background:rgba(13,148,136,0.15);border-left:3px solid #0D9488;padding:10px 12px;border-radius:0 6px 6px 0;margin-bottom:4px;color:#2DD4BF;font-size:14px;font-weight:600;">项目</div>
+        <div style="padding:10px 12px;color:#94A3B8;font-size:14px;">知识库</div>
+        <div style="padding:10px 12px;color:#94A3B8;font-size:14px;">模板</div>
+        <div style="padding:10px 12px;color:#94A3B8;font-size:14px;">设置</div>
+      </div>
+      <div style="flex:1;padding:22px 26px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+          <div style="font-size:20px;font-weight:700;color:#0F1B2D;">我的项目</div>
+          <div style="display:flex;gap:10px;align-items:center;">
+            <div style="background:#fff;border:1px solid #E3E8EF;border-radius:8px;padding:8px 14px;font-size:13px;color:#5A6B82;">🔍 搜索项目...</div>
+            <button style="background:#0D9488;color:#fff;border:none;font-size:14px;font-weight:600;padding:9px 16px;border-radius:8px;">+ 新建项目</button>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+          <div style="background:#fff;border:1px solid #E3E8EF;border-radius:12px;padding:18px;border-top:3px solid #0D9488;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><span style="font-weight:600;font-size:15px;color:#0F1B2D;">XX市智慧城市方案</span><span style="background:rgba(16,185,129,0.12);color:#10B981;font-size:12px;padding:3px 10px;border-radius:999px;">成功</span></div>
+            <div style="font-size:13px;color:#5A6B82;margin-bottom:12px;">全套方案 · 9 工具 · 2026-07-15</div>
+            <div style="height:6px;background:#EEF2F7;border-radius:3px;"><div style="width:100%;height:100%;background:#0D9488;border-radius:3px;"></div></div>
+          </div>
+          <div style="background:#fff;border:1px solid #E3E8EF;border-radius:12px;padding:18px;border-top:3px solid #F59E0B;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><span style="font-weight:600;font-size:15px;color:#0F1B2D;">国土空间规划</span><span style="background:rgba(245,158,11,0.15);color:#B45309;font-size:12px;padding:3px 10px;border-radius:999px;">部分完成</span></div>
+            <div style="font-size:13px;color:#5A6B82;margin-bottom:12px;">快速选型 · 2 工具 · 2026-07-14</div>
+            <div style="height:6px;background:#EEF2F7;border-radius:3px;"><div style="width:60%;height:100%;background:#F59E0B;border-radius:3px;"></div></div>
+          </div>
+          <div style="background:#fff;border:1px solid #E3E8EF;border-radius:12px;padding:18px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><span style="font-weight:600;font-size:15px;color:#0F1B2D;">低空经济平台</span><span style="background:rgba(13,148,136,0.12);color:#0D9488;font-size:12px;padding:3px 10px;border-radius:999px;">运行中</span></div>
+            <div style="font-size:13px;color:#5A6B82;margin-bottom:12px;">全套方案 · 进行中 · 2026-07-16</div>
+            <div style="height:6px;background:#EEF2F7;border-radius:3px;"><div style="width:35%;height:100%;background:#0D9488;border-radius:3px;"></div></div>
+          </div>
+          <div style="background:#fff;border:1px solid #E3E8EF;border-radius:12px;padding:18px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><span style="font-weight:600;font-size:15px;color:#0F1B2D;">自然资源调查</span><span style="background:#EEF2F7;color:#5A6B82;font-size:12px;padding:3px 10px;border-radius:999px;">草稿</span></div>
+            <div style="font-size:13px;color:#5A6B82;margin-bottom:12px;">未执行 · 2026-07-10</div>
+            <div style="height:6px;background:#EEF2F7;border-radius:3px;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Screen 3: 流程画布 -->
+  <div style="background:#fff;border:1px solid #E3E8EF;border-radius:8px;overflow:hidden;">
+    <div style="background:#0E1A2B;padding:6px 12px;display:flex;align-items:center;gap:6px;">
+      <span style="width:10px;height:10px;border-radius:50%;background:#EF4444;"></span><span style="width:10px;height:10px;border-radius:50%;background:#F59E0B;"></span><span style="width:10px;height:10px;border-radius:50%;background:#10B981;"></span>
+      <span style="color:#5A6B82;font-size:11px;margin-left:8px;">流程画布 / pipeline canvas</span>
+    </div>
+    <div style="display:flex;min-height:400px;background:#F4F6FA;">
+      <div style="width:200px;background:#0E1A2B;padding:18px 14px;box-sizing:border-box;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:24px;"><div style="width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,#0D9488,#F59E0B);"></div><span style="color:#E6EDF6;font-weight:700;font-size:15px;">GIS-Agent</span></div>
+        <div style="background:rgba(13,148,136,0.15);border-left:3px solid #0D9488;padding:10px 12px;border-radius:0 6px 6px 0;color:#2DD4BF;font-size:14px;font-weight:600;">项目</div>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;">
+        <div style="background:#fff;border-bottom:1px solid #E3E8EF;padding:14px 24px;display:flex;justify-content:space-between;align-items:center;">
+          <div style="display:flex;align-items:center;gap:10px;"><span style="font-weight:600;font-size:15px;">XX市智慧城市方案</span><span style="background:#EEF2F7;color:#5A6B82;font-size:12px;padding:3px 10px;border-radius:999px;">全套方案</span></div>
+          <button style="background:#0D9488;color:#fff;border:none;font-size:14px;font-weight:600;padding:9px 18px;border-radius:8px;">▶ 运行</button>
+        </div>
+        <div style="flex:1;position:relative;background:radial-gradient(#D8DEE8 1px,transparent 1px) 0 0/20px 20px;background-color:#F4F6FA;padding:24px;">
+          <svg style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;">
+            <path d="M140,70 C200,70 200,130 260,130" stroke="#0D9488" stroke-width="2" fill="none" opacity="0.5"/>
+            <path d="M260,130 C320,130 320,70 380,70" stroke="#0D9488" stroke-width="2" fill="none" opacity="0.5"/>
+            <path d="M380,70 C440,70 440,130 500,130" stroke="#0D9488" stroke-width="2" fill="none" opacity="0.5"/>
+          </svg>
+          <div style="position:absolute;left:70px;top:50px;background:#fff;border:1px solid #10B981;border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:8px;box-shadow:0 2px 8px rgba(0,0,0,0.06);"><div style="width:26px;height:26px;border-radius:7px;background:rgba(16,185,129,0.15);color:#10B981;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;">T1</div><div style="font-size:13px;font-weight:600;">需求分析</div><div style="width:7px;height:7px;border-radius:50%;background:#10B981;"></div></div>
+          <div style="position:absolute;left:268px;top:110px;background:#fff;border:1px solid #0D9488;border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:8px;box-shadow:0 2px 8px rgba(0,0,0,0.06);"><div style="width:26px;height:26px;border-radius:7px;background:rgba(13,148,136,0.15);color:#0D9488;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;">T3</div><div style="font-size:13px;font-weight:600;">产品匹配</div><div style="width:7px;height:7px;border-radius:50%;background:#0D9488;box-shadow:0 0 6px #0D9488;"></div></div>
+          <div style="position:absolute;left:388px;top:50px;background:#fff;border:1px solid #E3E8EF;border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:8px;opacity:0.7;"><div style="width:26px;height:26px;border-radius:7px;background:#EEF2F7;color:#5A6B82;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;">T2</div><div style="font-size:13px;font-weight:600;">案例推荐</div><div style="width:7px;height:7px;border-radius:50%;background:#CBD5E1;"></div></div>
+          <div style="position:absolute;left:508px;top:110px;background:#fff;border:1px solid #E3E8EF;border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:8px;opacity:0.7;"><div style="width:26px;height:26px;border-radius:7px;background:#EEF2F7;color:#5A6B82;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;">T5</div><div style="font-size:13px;font-weight:600;">架构图</div><div style="width:7px;height:7px;border-radius:50%;background:#CBD5E1;"></div></div>
+          <div style="position:absolute;right:20px;top:20px;width:200px;background:#fff;border:1px solid #E3E8EF;border-radius:10px;padding:14px;box-shadow:0 4px 14px rgba(0,0,0,0.07);">
+            <div style="font-size:13px;font-weight:700;color:#0F1B2D;margin-bottom:10px;">节点属性 · T3 产品匹配</div>
+            <div style="font-size:12px;color:#5A6B82;margin-bottom:5px;">知识库：产品文档库</div>
+            <div style="font-size:12px;color:#5A6B82;margin-bottom:5px;">TopK：5</div>
+            <div style="font-size:12px;color:#5A6B82;margin-bottom:10px;">模型：deepseek-v3</div>
+            <div style="background:rgba(13,148,136,0.1);color:#0D9488;font-size:12px;padding:5px 10px;border-radius:6px;">运行中 · 1m20s</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:16px;padding:16px 20px;background:#fff;border:1px solid #E3E8EF;border-radius:8px;font-size:13px;color:#5A6B82;">
+    🔒 原型 v2 · 深浅搭配（浅色工作区 + 深色侧栏/舞台）· 深青绿 #0D9488 + 琥珀 #F59E0B 双色 · 登录页三维球。待龙哥确认后作为全局基线，确认前不写前端代码。
+  </div>
+</div>
+</body>
+</html>

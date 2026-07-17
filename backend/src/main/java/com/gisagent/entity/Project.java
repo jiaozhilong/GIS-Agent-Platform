@@ -2,6 +2,8 @@ package com.gisagent.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.time.Instant;
 
 @Entity
@@ -32,6 +34,7 @@ public class Project {
     @Builder.Default
     private String status = "DRAFT";
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "context_json", columnDefinition = "JSONB")
     private String contextJson;
 

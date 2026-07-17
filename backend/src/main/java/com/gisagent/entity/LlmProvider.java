@@ -32,6 +32,10 @@ public class LlmProvider {
     @Column(name = "api_key_encrypted", length = 512)
     private String apiKeyEncrypted;
 
+    /** 模型名，如 deepseek-chat / gpt-4o / qwen-max */
+    @Column(name = "model", length = 128)
+    private String model;
+
     @Column(name = "is_default", nullable = false)
     @Builder.Default
     private Boolean isDefault = false;

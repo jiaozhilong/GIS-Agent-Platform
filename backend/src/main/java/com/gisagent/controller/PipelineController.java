@@ -220,7 +220,14 @@ public class PipelineController {
     }
 
     private String defaultModel(LlmProvider provider) {
-        // TODO: 从 provider 的模型列表取默认模型
+        if (provider.getModel() != null && !provider.getModel().isBlank()) {
+            return provider.getModel();
+        }
+        // 兜底：根据 endpoint 推断常见默认模型
+        String ep = provider.getEndpoint() == null ? "" : provider.getEndpoint().toLowerCase();
+        if (ep.contains("deepseek")) return "deepseek-chat";
+        if (ep.contains("openai.com")) return "gpt-4o";
+        if (ep.contains("qwen") || ep.contains("dashscope")) return "qwen-max";
         return "gpt-4o";
     }
 
