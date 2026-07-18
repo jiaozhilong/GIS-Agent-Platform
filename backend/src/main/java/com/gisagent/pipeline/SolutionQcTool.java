@@ -28,11 +28,15 @@ public class SolutionQcTool implements PipelineTool {
         输出 JSON schema:
         {
           "overallScore": 85,
+          "passed": true,
+          "level": "良好",
           "dimensions": [
             { "dimension": "需求覆盖度", "score": 90, "comment": "点评" }
           ],
           "suggestions": ["改进建议1", "改进建议2"]
         }
+        评级规则：整体分 ≥ 90 为"优秀"，≥ 80 为"良好"，≥ 70 为"合格"，< 70 为"待改进"；
+        整体分 ≥ 75 时 passed 为 true，否则为 false。suggestions 是针对低分维度可落地的改进点。
         """;
 
     public SolutionQcTool(LlmService llmService) {
@@ -95,8 +99,11 @@ public class SolutionQcTool implements PipelineTool {
                 sug.forEach(s -> suggestions.add(s.asText()));
             }
             qc.setSuggestions(suggestions);
+            double overall = qc.getOverallScore();
+            qc.setPassed(overall >= 75.0);
+            qc.setLevel(overall >= 90 ? "优秀" : overall >= 80 ? "良好" : overall >= 70 ? "合格" : "待改进");
             context.setQualityCheck(qc);
-            log.info("方案质检完成，整体分={}", qc.getOverallScore());
+            log.info("方案质检完成，整体分={}，等级={}，通过={}", overall, qc.getLevel(), qc.getPassed());
             return true;
         } catch (Exception e) {
             log.error("解析质检结果失败", e);

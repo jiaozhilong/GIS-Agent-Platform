@@ -49,18 +49,27 @@ public class SolutionOutlineTool implements PipelineTool {
             return false;
         }
 
+        String suggestions = "";
+        if (context.getQualityCheck() != null
+                && context.getQualityCheck().getSuggestions() != null
+                && !context.getQualityCheck().getSuggestions().isEmpty()) {
+            suggestions = "\n\n上一轮质检的改进建议（请在本轮大纲中落实，针对性补强相关章节）：\n- "
+                    + String.join("\n- ", context.getQualityCheck().getSuggestions());
+        }
+
         String userPrompt = """
             需求分析：%s
             产品选型：%s
             案例推荐：%s
-            竞品对比：%s
+            竞品对比：%s%s
 
             请生成解决方案大纲。
             """.formatted(
                 context.getRequirements(),
                 context.getProductSelection(),
                 context.getCaseRecommendations(),
-                context.getCompetitorAnalysis()
+                context.getCompetitorAnalysis(),
+                suggestions
         );
 
         String raw = llmService.complete(

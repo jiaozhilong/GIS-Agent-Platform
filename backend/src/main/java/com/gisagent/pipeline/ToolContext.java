@@ -134,6 +134,10 @@ public class ToolContext {
         private double overallScore;
         private List<DimensionScore> dimensions;
         private List<String> suggestions;
+        /** 是否通过（整体分 ≥ 阈值 75） */
+        private Boolean passed;
+        /** 等级：优秀 / 良好 / 合格 / 待改进 */
+        private String level;
     }
 
     /** Tool-7 输出：单维度评分 */

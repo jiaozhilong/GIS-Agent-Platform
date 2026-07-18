@@ -155,6 +155,13 @@ export default function ProjectDetailPage() {
     }
   };
 
+  // ===== 按质检建议改进：从方案大纲节点重跑（大纲会吸收质检建议） =====
+  const handleImprove = async () => {
+    const outline = tools.find((t) => t.toolType === 'SOLUTION_OUTLINE');
+    if (!outline) { showToast('未找到方案大纲节点', true); return; }
+    await handleRerun(outline);
+  };
+
   if (loading && !detail) {
     return <div className="empty-state"><p>加载中…</p></div>;
   }
@@ -258,7 +265,7 @@ export default function ProjectDetailPage() {
                       )}
                     </div>
                   </div>
-                  <ResultBody tool={t} />
+                  <ResultBody tool={t} onImprove={t.toolType === 'SOLUTION_QC' ? handleImprove : undefined} improving={rerunning !== null} />
                 </div>
               ))
             )}
@@ -324,7 +331,7 @@ export default function ProjectDetailPage() {
   );
 }
 
-function ResultBody({ tool }: { tool: ToolStatus }) {
+function ResultBody({ tool, onImprove, improving }: { tool: ToolStatus; onImprove?: () => void; improving?: boolean }) {
   const o = tool.output;
   if (!o) return null;
   if (tool.toolType === 'REQUIREMENT_ANALYSIS') {
@@ -342,6 +349,54 @@ function ResultBody({ tool }: { tool: ToolStatus }) {
         {o.slice(0, 4).map((p: any, i: number) => (
           <p key={i}>{p.productName} · {p.version} · 覆盖率 {p.coverage}</p>
         ))}
+      </div>
+    );
+  }
+  if (tool.toolType === 'SOLUTION_QC') {
+    const score = typeof o.overallScore === 'number' ? o.overallScore : 0;
+    const level = o.level || (score >= 90 ? '优秀' : score >= 80 ? '良好' : score >= 70 ? '合格' : '待改进');
+    const passed = o.passed === undefined ? score >= 75 : o.passed;
+    const levelCls = level === '优秀' ? 'lv-excellent' : level === '良好' ? 'lv-good' : level === '合格' ? 'lv-ok' : 'lv-warn';
+    const dims = Array.isArray(o.dimensions) ? o.dimensions : [];
+    const sugs = Array.isArray(o.suggestions) ? o.suggestions : [];
+    return (
+      <div className="qc-dash">
+        <div className="qc-top">
+          <div className={`qc-ring ${passed ? 'pass' : 'fail'}`} style={{ ['--p' as any]: `${score}%` }}>
+            <span className="qc-score">{Math.round(score)}</span>
+            <span className="qc-unit">分</span>
+          </div>
+          <div className="qc-meta">
+            <span className={`qc-level ${levelCls}`}>{level}</span>
+            <span className={`qc-pass ${passed ? 'yes' : 'no'}`}>{passed ? '✓ 通过验收' : '✗ 未达验收线'}</span>
+            <p className="qc-hint">整体分 ≥ 75 视为通过；为让方案更稳，可点「按建议改进并重跑」让大纲吸收质检建议后重生成。</p>
+          </div>
+        </div>
+        {dims.length > 0 && (
+          <div className="qc-dims">
+            {dims.map((d: any, i: number) => (
+              <div className="qc-dim" key={i}>
+                <div className="qc-dim-head">
+                  <span className="qc-dim-name">{d.dimension}</span>
+                  <span className="qc-dim-score">{Math.round(typeof d.score === 'number' ? d.score : 0)}</span>
+                </div>
+                <div className="qc-bar"><span style={{ width: `${Math.max(0, Math.min(100, typeof d.score === 'number' ? d.score : 0))}%` }} /></div>
+                {d.comment && <p className="qc-dim-comment">{d.comment}</p>}
+              </div>
+            ))}
+          </div>
+        )}
+        {sugs.length > 0 && (
+          <div className="qc-sugs">
+            <h4>改进建议</h4>
+            <ul>{sugs.map((s: string, i: number) => <li key={i}>{s}</li>)}</ul>
+          </div>
+        )}
+        {onImprove && (
+          <button className="btn btn-primary btn-sm qc-improve" onClick={onImprove} disabled={improving}>
+            {improving ? <IconSync width={13} height={13} className="spin" /> : <IconSync width={13} height={13} />} 按建议改进并重跑
+          </button>
+        )}
       </div>
     );
   }
