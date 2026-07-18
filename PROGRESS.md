@@ -65,8 +65,8 @@
 > 详见仓库根 `后续计划.md`（2026-07-18 编制）。现状审计结论：**Phase 1~3 全部落地；导出为 Apache POI 真实生成 docx/pptx/md（非 stub）**。
 
 ### 待收尾（demo 壳 / 遗留 TODO，对应后续计划 F-A~F-E）
-- **F-A** API Key 明文存储（`LlmProviderController.java:55` TODO 加密）— 🔴 安全，必做
-- **F-B** LLM 连通性测试未真调模型（`LlmProviderController.java:80` TODO）— 🟡
+- **F-A** ✅ API Key 加密存储（`EncryptionService` AES-256-GCM，master key 取 `APP_MASTER_KEY`）— 已完成
+- **F-B** ✅ LLM 连通性真调模型（`LlmService.testConnect` 真实发最小请求，非恒真）— 已完成
 - **F-C** IMA 连通性测试是否真连待确认 — 🟡
 - **F-D** "可用 Skills / 12" 写死常量，无独立 skills 接口 — 🟡
 

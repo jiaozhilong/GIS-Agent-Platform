@@ -3,6 +3,8 @@ package com.gisagent.controller;
 import com.gisagent.dto.LlmProviderDto;
 import com.gisagent.entity.LlmProvider;
 import com.gisagent.repository.LlmProviderRepository;
+import com.gisagent.service.LlmService;
+import com.gisagent.util.EncryptionService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -17,9 +19,15 @@ import java.util.stream.Collectors;
 public class LlmProviderController {
 
     private final LlmProviderRepository providerRepository;
+    private final EncryptionService encryptionService;
+    private final LlmService llmService;
 
-    public LlmProviderController(LlmProviderRepository providerRepository) {
+    public LlmProviderController(LlmProviderRepository providerRepository,
+                                 EncryptionService encryptionService,
+                                 LlmService llmService) {
         this.providerRepository = providerRepository;
+        this.encryptionService = encryptionService;
+        this.llmService = llmService;
     }
 
     @GetMapping
@@ -52,7 +60,7 @@ public class LlmProviderController {
                 .name(request.getName())
                 .providerType(request.getProviderType())
                 .endpoint(request.getEndpoint())
-                .apiKeyEncrypted(request.getApiKey()) // TODO: 加密存储
+                .apiKeyEncrypted(encryptionService.encrypt(request.getApiKey())) // F-A: 加密存储
                 .model(request.getModel())
                 .isDefault(request.getIsDefault() != null && request.getIsDefault())
                 .build();
@@ -77,11 +85,15 @@ public class LlmProviderController {
         Long userId = (Long) auth.getPrincipal();
         return providerRepository.findByIdAndUserId(id, userId)
                 .map(p -> {
-                    // TODO: 实际调用模型 API 测试连通性
+                    // F-B: 解密后真实调用模型 API 验证连通性（非恒真占位）
+                    String key = encryptionService.decrypt(p.getApiKeyEncrypted());
+                    long start = System.currentTimeMillis();
+                    boolean ok = llmService.testConnect(p.getEndpoint(), key, p.getModel());
+                    long cost = System.currentTimeMillis() - start;
                     LlmProviderDto.TestResponse response = new LlmProviderDto.TestResponse();
-                    response.setSuccess(true);
-                    response.setResponseTimeMs(150L);
-                    response.setMessage("连接成功");
+                    response.setSuccess(ok);
+                    response.setResponseTimeMs(cost);
+                    response.setMessage(ok ? "连接成功" : "连接失败：无法调用模型 API（请检查 endpoint / apiKey / model 或网络）");
                     return ResponseEntity.ok(response);
                 })
                 .orElse(ResponseEntity.notFound().build());

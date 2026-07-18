@@ -8,9 +8,11 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -24,11 +26,18 @@ import java.util.Map;
 @Slf4j
 public class LlmService {
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    @Value("${llm.default-timeout-seconds:120}")
-    private int defaultTimeoutSeconds;
+    private final int defaultTimeoutSeconds;
+
+    public LlmService(@Value("${llm.default-timeout-seconds:120}") int configuredTimeout) {
+        this.defaultTimeoutSeconds = configuredTimeout;
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(Duration.ofSeconds(10));
+        factory.setReadTimeout(Duration.ofSeconds(configuredTimeout));
+        this.restTemplate = new RestTemplate(factory);
+    }
 
     /**
      * 调用 LLM 进行单次补全。
@@ -73,6 +82,43 @@ public class LlmService {
         } catch (Exception e) {
             log.error("LLM 调用失败: endpoint={}, model={}", endpoint, model, e);
             throw new RuntimeException("LLM 调用失败: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 连通性测试：发送最小 chat 请求，校验模型是否返回非空内容。
+     * 用于 Provider 配置页的「连接测试」按钮，替代恒真占位逻辑。
+     *
+     * @return 连通成功且模型返回内容则为 true
+     */
+    public boolean testConnect(String endpoint, String apiKey, String model) {
+        String url = ensureChatCompletionsUrl(endpoint);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        if (apiKey != null && !apiKey.isBlank()) {
+            headers.setBearerAuth(apiKey);
+        }
+
+        List<Map<String, String>> messages = new ArrayList<>();
+        messages.add(Map.of("role", "user", "content", "ping"));
+        Map<String, Object> body = new HashMap<>();
+        body.put("model", (model != null && !model.isBlank()) ? model : "deepseek-chat");
+        body.put("messages", messages);
+        body.put("max_tokens", 5);
+
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+        try {
+            ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
+            if (!response.getStatusCode().is2xxSuccessful()) {
+                log.warn("LLM 连通性测试返回非 2xx: {}", response.getStatusCode());
+                return false;
+            }
+            String content = extractContent(response.getBody());
+            return content != null && !content.isBlank();
+        } catch (Exception e) {
+            log.warn("LLM 连通性测试失败: {}", e.getMessage());
+            return false;
         }
     }
 
