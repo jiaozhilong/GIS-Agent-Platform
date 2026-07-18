@@ -1,6 +1,7 @@
 package com.gisagent.export;
 
 import com.gisagent.pipeline.ToolContext;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.xslf.usermodel.*;
 import org.apache.poi.xwpf.usermodel.*;
@@ -35,6 +36,12 @@ public class ExportService {
     /** 可选 PPT 品牌模板路径（由 UI 提供 .pptx，JIT 门禁产物） */
     @Value("${storage.pptx-template:}")
     private String pptxTemplatePath;
+
+    @PostConstruct
+    public void init() {
+        // 解析为绝对路径，避免相对路径依赖 JVM 工作目录导致导出位置不可预测。
+        this.exportDir = new File(exportDir).getAbsolutePath();
+    }
 
     // 品牌色：深蓝黑底 + 青/蓝绿主色
     private static final byte[] BG = {0x0A, 0x1A, 0x2F};

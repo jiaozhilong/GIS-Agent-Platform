@@ -69,6 +69,9 @@
 - **F-B** ✅ LLM 连通性真调模型（`LlmService.testConnect` 真实发最小请求，非恒真）— 已完成
 - **F-C** ✅ IMA 连通性真连（`RealIMAKnowledgeBaseConnector.testConnection` 真实调用 `search_note_book` + 加连接/读取超时 8s/15s；Mock 恒真仅用于无网调试；控制器接线已实测返回 success=true）— 已完成
 - **F-D** ✅ Skills 接口化（新增 `SkillsController`：`GET /api/skills` 由实际注册的 8 个 PipelineTool bean 驱动，返回真实工具数/名称/分类；Dashboard "可编排 Skills" 已改为动态获取，去掉写死 12；登录页静态 12 按用户要求保持不变）— 已完成
+- **F-E** ✅ 端到端走通验收脚本 `p4_acceptance.py`（纯标准库、可配置，联网环境一键跑通：注册→建 Provider 真连→建 IMA 真连→建项目→跑流水线→轮询→下载 md/docx/pptx）；沙箱受控运行验证脚本机制无误（网络相关步骤按预期 FAIL）。另修复项目创建 400：`ProjectController`/`ExportService` 上传与导出目录改为绝对路径并确保存在，规避 `MultipartFile.transferTo` 相对路径解析到 Tomcat 临时目录导致保存失败。— 已完成
+
+> P0 功能收尾（F-A~F-E）全部完成。后续"功能全做完并走通"需在**用户联网环境**运行 `python3 p4_acceptance.py`（配置 DeepSeek + IMA 真实凭证，后端设 `IMA_MOCK_ENABLED=false`）全绿方为终态。
 
 ### Phase 4 生态化（开发计划 P4-1~5，完全未做）
 P4-1 模板市场社区共享 ／ P4-2 企业级 RBAC ／ P4-3 方案版本管理 ／ P4-4 使用数据看板 ／ P4-5 Agent 自编排。

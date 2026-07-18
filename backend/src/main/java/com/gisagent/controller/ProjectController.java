@@ -8,6 +8,7 @@ import com.gisagent.repository.ProjectDocumentRepository;
 import com.gisagent.repository.ProjectRepository;
 import com.gisagent.repository.PipelineRunRepository;
 import com.gisagent.repository.ToolExecutionRepository;
+import jakarta.annotation.PostConstruct;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
@@ -31,6 +32,14 @@ public class ProjectController {
 
     @Value("${storage.upload-dir:./data/uploads}")
     private String uploadDir;
+
+    @PostConstruct
+    public void init() {
+        // 解析为绝对路径并确保目录存在：避免 MultipartFile.transferTo 对相对路径
+        // 解析到 Tomcat 临时目录导致保存失败时目录不存在（FileNotFoundException）。
+        this.uploadDir = new File(uploadDir).getAbsolutePath();
+        new File(uploadDir).mkdirs();
+    }
 
     public ProjectController(ProjectRepository projectRepository,
                              ProjectDocumentRepository documentRepository,
