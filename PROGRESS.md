@@ -67,7 +67,7 @@
 ### 待收尾（demo 壳 / 遗留 TODO，对应后续计划 F-A~F-E）
 - **F-A** ✅ API Key 加密存储（`EncryptionService` AES-256-GCM，master key 取 `APP_MASTER_KEY`）— 已完成
 - **F-B** ✅ LLM 连通性真调模型（`LlmService.testConnect` 真实发最小请求，非恒真）— 已完成
-- **F-C** IMA 连通性测试是否真连待确认 — 🟡
+- **F-C** ✅ IMA 连通性真连（`RealIMAKnowledgeBaseConnector.testConnection` 真实调用 `search_note_book` + 加连接/读取超时 8s/15s；Mock 恒真仅用于无网调试；控制器接线已实测返回 success=true）— 已完成
 - **F-D** "可用 Skills / 12" 写死常量，无独立 skills 接口 — 🟡
 
 ### Phase 4 生态化（开发计划 P4-1~5，完全未做）

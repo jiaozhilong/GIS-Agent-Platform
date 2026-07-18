@@ -9,6 +9,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
@@ -33,7 +34,7 @@ public class RealIMAKnowledgeBaseConnector implements IMAKnowledgeBaseConnector 
     private static final Logger log = LoggerFactory.getLogger(RealIMAKnowledgeBaseConnector.class);
     private static final String DEFAULT_BASE = "https://ima.qq.com/openapi/note/v1";
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private RestTemplate restTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${ima.openapi-base-url:" + DEFAULT_BASE + "}")
@@ -44,6 +45,20 @@ public class RealIMAKnowledgeBaseConnector implements IMAKnowledgeBaseConnector 
 
     @Value("${ima.openapi.api-key:}")
     private String apiKey;
+
+    @Value("${ima.connect-timeout-ms:8000}")
+    private int connectTimeoutMs;
+
+    @Value("${ima.read-timeout-ms:15000}")
+    private int readTimeoutMs;
+
+    @jakarta.annotation.PostConstruct
+    public void init() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(connectTimeoutMs);
+        factory.setReadTimeout(readTimeoutMs);
+        this.restTemplate = new RestTemplate(factory);
+    }
 
     private HttpHeaders authHeaders() {
         HttpHeaders headers = new HttpHeaders();
