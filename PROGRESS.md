@@ -60,6 +60,22 @@
 - **前端**：`ProjectDetailPage` 在项目详情顶部 render「📡 知识库有更新」横幅（含更新说明 + 「用最新知识库重生成」按钮，调用 `projectApi.rerunKb`）；`client.ts` 增加 `projectApi.rerunKb` / `imaApi.kbSync` / `imaApi.kbSimulate`；`pages.css` 增加 `.kb-dirty-banner` 样式。
 - **验证**：mock 模式端到端 PASS——初始 run SUCCESS(`kbDirty=false`) → `kb-simulate` 触发 MODIFIED 事件 → 项目 `kbDirty=true` 且 `kbDirtyNote` 含更新来源 → `rerun-kb` → run SUCCESS 且 `kbDirty` 清除。`npm run build` + `mvn package` 均通过。生产（real）模式 `getUpdates` 当前为 stub，机制就绪、待真实 IMA 事件接入即生效。
 
+## 功能收尾 & Phase 4 计划
+
+> 详见仓库根 `后续计划.md`（2026-07-18 编制）。现状审计结论：**Phase 1~3 全部落地；导出为 Apache POI 真实生成 docx/pptx/md（非 stub）**。
+
+### 待收尾（demo 壳 / 遗留 TODO，对应后续计划 F-A~F-E）
+- **F-A** API Key 明文存储（`LlmProviderController.java:55` TODO 加密）— 🔴 安全，必做
+- **F-B** LLM 连通性测试未真调模型（`LlmProviderController.java:80` TODO）— 🟡
+- **F-C** IMA 连通性测试是否真连待确认 — 🟡
+- **F-D** "可用 Skills / 12" 写死常量，无独立 skills 接口 — 🟡
+
+### Phase 4 生态化（开发计划 P4-1~5，完全未做）
+P4-1 模板市场社区共享 ／ P4-2 企业级 RBAC ／ P4-3 方案版本管理 ／ P4-4 使用数据看板 ／ P4-5 Agent 自编排。
+
+### 走通验证
+沙箱无外网，LLM 全链路需在真实环境（DeepSeek + IMA）跑 `p4_acceptance.py` 全绿方算"功能全做完"。
+
 ## 验证结果
 - `npm run build`：tsc 严格模式 + vite 构建通过
 - 后端链路实测：注册→登录→建项目→详情→状态→建 Provider→建 IMA 配置→启动流水线 全部 200
