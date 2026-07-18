@@ -341,6 +341,13 @@
 .template-meta span { display: flex; align-items: center; gap: 4px; }
 .template-meta svg { width: 13px; height: 13px; }
 .template-footer { display: flex; gap: 8px; padding: 14px 24px; border-top: 1px solid var(--line); background: rgba(0, 0, 0, .10); }
+.tpl-owner { color: var(--cyan) !important; }
+.template-social { display: flex; gap: 8px; padding: 0 24px 16px; }
+.social-btn { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px; padding: 5px 12px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255, 255, 255, .03); color: var(--muted); font-size: 12px; cursor: pointer; transition: .2s ease; }
+.social-btn:hover:not(:disabled) { border-color: var(--line-strong); color: var(--text); }
+.social-btn:disabled { opacity: .6; cursor: not-allowed; }
+.social-btn.active { color: var(--mint); border-color: rgba(146, 246, 190, .5); background: rgba(146, 246, 190, .10); }
+.social-btn.ghost { color: var(--cyan); border-color: rgba(94, 230, 225, .35); }
 
 @media (max-width: 760px) { .template-grid { grid-template-columns: 1fr; } }
 

@@ -70,13 +70,22 @@ export const templateApi = {
   // 模板列表，可选 category 过滤（official/community/mine）
   list: (category?: string) =>
     apiClient.get('/templates', { params: category ? { category } : {} }),
+  // 模板市场（带点赞/收藏/作者态）：scope=all|official|community|mine
+  market: (scope: string = 'all', keyword?: string) =>
+    apiClient.get('/templates/market', { params: { scope, ...(keyword ? { keyword } : {}) } }),
   // 模板详情
   getByKey: (key: string) => apiClient.get(`/templates/${key}`),
-  // 保存自定义模板（名称 + 工具链）
-  create: (data: { name: string; description?: string; toolChain: string[]; estimatedTime?: string }) =>
+  // 保存自定义模板（名称 + 工具链 + 可选 category=mine|community）
+  create: (data: { name: string; description?: string; toolChain: string[]; estimatedTime?: string; category?: string }) =>
     apiClient.post('/templates', data),
   // 删除自定义模板（仅 mine）
   remove: (key: string) => apiClient.delete(`/templates/${key}`),
+  // 点赞 / 取消点赞（toggle）
+  like: (id: number) => apiClient.post(`/templates/${id}/like`),
+  // 收藏 / 取消收藏（toggle）
+  favorite: (id: number) => apiClient.post(`/templates/${id}/favorite`),
+  // 发布到社区 / 撤回为私有
+  publish: (id: number, community: boolean) => apiClient.post(`/templates/${id}/publish?community=${community}`),
 };
 
 // ===== Project & Pipeline API =====

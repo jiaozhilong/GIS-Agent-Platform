@@ -21,4 +21,7 @@ public class TemplateSaveRequest {
 
     /** 预估耗时，如 "约 10 分钟" */
     private String estimatedTime;
+
+    /** 可见范围：mine=仅自己，community=发布到社区市场（默认 mine） */
+    private String category;
 }

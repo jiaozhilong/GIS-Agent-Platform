@@ -210,3 +210,30 @@ CREATE TABLE IF NOT EXISTS project_versions (
 
 CREATE INDEX IF NOT EXISTS idx_project_versions_project ON project_versions(project_id);
 
+-- ============================================================
+-- 模板市场（P4-1 社区共享 / 点赞 / 收藏）
+-- ============================================================
+ALTER TABLE pipeline_templates ADD COLUMN IF NOT EXISTS owner_id      BIGINT;
+ALTER TABLE pipeline_templates ADD COLUMN IF NOT EXISTS like_count    BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE pipeline_templates ADD COLUMN IF NOT EXISTS favorite_count BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE pipeline_templates ADD COLUMN IF NOT EXISTS published     BOOLEAN NOT NULL DEFAULT TRUE;
+
+CREATE TABLE IF NOT EXISTS template_likes (
+    id          BIGSERIAL PRIMARY KEY,
+    template_id BIGINT       NOT NULL REFERENCES pipeline_templates(id) ON DELETE CASCADE,
+    user_id     BIGINT       NOT NULL,
+    created_at  TIMESTAMP    NOT NULL DEFAULT NOW(),
+    UNIQUE(template_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_template_likes_tpl ON template_likes(template_id);
+
+CREATE TABLE IF NOT EXISTS template_favorites (
+    id          BIGSERIAL PRIMARY KEY,
+    template_id BIGINT       NOT NULL REFERENCES pipeline_templates(id) ON DELETE CASCADE,
+    user_id     BIGINT       NOT NULL,
+    created_at  TIMESTAMP    NOT NULL DEFAULT NOW(),
+    UNIQUE(template_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_template_favorites_tpl ON template_favorites(template_id);
+
+

@@ -76,6 +76,12 @@
 ### Phase 4 生态化（开发计划 P4-1~5）
 P4-1 模板市场社区共享 ／ P4-2 企业级 RBAC ／ P4-3 方案版本管理 ／ P4-4 使用数据看板 ／ P5 Agent 自编排。
 
+- **P4-1** ✅ 模板市场/社区共享（2026-07-18）：
+  - 后端：`PipelineTemplate` 增加 `ownerId/likeCount/favoriteCount/published` 字段 + `template_likes`/`template_favorites` 表（唯一约束 (templateId,userId)）；`GET /api/templates/market?scope=all|official|community|mine` 返回带点赞/收藏计数、作者名、当前用户 isLiked/isFavorited/canEdit 态；`POST /api/templates/{id}/like`、`/favorite` 为 toggle（修复派生删除缺事务的 `TransactionRequiredException`，给 toggle 方法加 `@Transactional`）；`POST /api/templates/{id}/publish?community=` 发布/撤回社区；`save` 支持 `category=community` 发布（带 ownerId）。
+  - 前端：`TemplatesPage` 切换市场端点，卡片新增 ♥点赞 / ★收藏 / 作者 / 「发布社区·撤回」操作，计数实时刷新；`templateApi` 新增 `market/like/favorite/publish`。
+  - **集成验证全绿**（`/tmp/p4_1_verify.py`，16 断言）：发布社区模板 → 市场 all/community/mine 可见且展示作者 → 跨用户 mine 隔离 → B 点赞/收藏计数=1 且 B 市场视图 isLiked/isFavorited=true → B 取消点赞归零 → B 删 A 模板 403 → A 撤回移出社区、再发布回社区 → A 删自己成功。
+  - 注意：登录页动效未改动。
+
 - **P4-3** ✅ 方案版本管理（2026-07-18）：
   - 后端：`ProjectVersion` 实体 + `project_versions` 表（已补建并修正属主为 `gisagent`，规避 `ddl-auto:validate` 对已有库增量建表的顺序坑）；`ProjectVersionService` 提供快照/列表/详情/回退；`ProjectVersionController` 暴露 `/api/projects/{id}/versions`（`POST` 保存、`GET` 列表、`GET /{vid}` 详情、`POST /{vid}/restore` 回退），含 `owned()` 归属校验（跨用户 404）。
   - 自动快照：每次流水线 `run` / 知识库重生成（`KB_RERUN`）/ 下游重跑成功后，由 `PipelineEngine` 写入版本快照（`triggerType=AUTO_RUN`/`KB_RERUN`），无需手工操作即留痕。

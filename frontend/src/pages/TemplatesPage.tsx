@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { templateApi } from '../api/client';
 import { useToast } from '../components/ui/Toast';
-import { IconTemplate, IconPlay, IconDoc, IconClock, IconPlus } from '../components/ui/icons';
+import { IconTemplate, IconPlay, IconDoc, IconClock, IconPlus, IconUser } from '../components/ui/icons';
 
 // toolType → 中文展示名（与后端 PipelineEngine TOOL_BY_TYPE 对齐）
 const TOOL_LABEL: Record<string, string> = {
@@ -22,9 +22,16 @@ interface Tpl {
   name: string;
   category: 'official' | 'community' | 'mine';
   description: string;
-  toolChain: string[]; // toolType 列表
+  toolChain: string[];
   estimatedTime?: string;
   usageCount?: number;
+  likeCount?: number;
+  favoriteCount?: number;
+  ownerName?: string;
+  isLiked?: boolean;
+  isFavorited?: boolean;
+  canEdit?: boolean;
+  published?: boolean;
   builtin: boolean;
 }
 
@@ -34,36 +41,41 @@ export default function TemplatesPage() {
   const [tab, setTab] = useState<'all' | 'official' | 'community' | 'mine'>('all');
   const [templates, setTemplates] = useState<Tpl[]>([]);
   const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState<number | null>(null);
   const navigate = useNavigate();
   const { showToast } = useToast();
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const params = tab === 'all' ? undefined : { category: tab };
-        const res = await templateApi.list(params?.category);
-        if (cancelled) return;
-        const list: any[] = res.data || [];
-        setTemplates(list.map((t) => ({
-          id: t.id,
-          templateKey: t.templateKey,
-          name: t.name,
-          category: t.category || 'official',
-          description: t.description || '',
-          toolChain: parseChain(t.toolChain),
-          estimatedTime: t.estimatedTime,
-          usageCount: t.usageCount || 0,
-          builtin: t.builtin,
-        })));
-      } catch (e) {
-        if (!cancelled) showToast('模板列表加载失败');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [tab, showToast]);
+  const load = async () => {
+    setLoading(true);
+    try {
+      const { data } = await templateApi.market(tab);
+      const list: any[] = data || [];
+      setTemplates(list.map((t) => ({
+        id: t.id,
+        templateKey: t.templateKey,
+        name: t.name,
+        category: t.category || 'official',
+        description: t.description || '',
+        toolChain: parseChain(t.toolChain),
+        estimatedTime: t.estimatedTime,
+        usageCount: t.usageCount || 0,
+        likeCount: t.likeCount || 0,
+        favoriteCount: t.favoriteCount || 0,
+        ownerName: t.ownerName,
+        isLiked: !!t.isLiked,
+        isFavorited: !!t.isFavorited,
+        canEdit: !!t.canEdit,
+        published: t.published !== false,
+        builtin: t.builtin,
+      })));
+    } catch (e) {
+      showToast('模板市场加载失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [tab]);
 
   const useTemplate = (t: Tpl) => {
     showToast(`已加载模板「${t.name}」，请上传需求文档`);
@@ -74,12 +86,44 @@ export default function TemplatesPage() {
     showToast(`「${t.name}」流程：${t.toolChain.map((c) => TOOL_LABEL[c] || c).join(' → ')}`);
   };
 
+  const toggleLike = async (t: Tpl) => {
+    setBusyId(t.id);
+    try {
+      const { data } = await templateApi.like(t.id);
+      setTemplates((prev) => prev.map((x) => x.id === t.id
+        ? { ...x, isLiked: data.liked, likeCount: data.likeCount } : x));
+    } catch { showToast('操作失败，请确认已登录'); }
+    finally { setBusyId(null); }
+  };
+
+  const toggleFav = async (t: Tpl) => {
+    setBusyId(t.id);
+    try {
+      const { data } = await templateApi.favorite(t.id);
+      setTemplates((prev) => prev.map((x) => x.id === t.id
+        ? { ...x, isFavorited: data.favorited, favoriteCount: data.favoriteCount } : x));
+    } catch { showToast('操作失败，请确认已登录'); }
+    finally { setBusyId(null); }
+  };
+
+  const togglePublish = async (t: Tpl) => {
+    const toCommunity = t.category !== 'community';
+    setBusyId(t.id);
+    try {
+      await templateApi.publish(t.id, toCommunity);
+      showToast(toCommunity ? '已发布到社区市场' : '已撤回为私有');
+      await load();
+    } catch (e: any) {
+      showToast(e?.response?.data?.message || '发布操作失败');
+    } finally { setBusyId(null); }
+  };
+
   return (
     <div>
       <div className="page-head">
         <div>
           <h1>模板市场</h1>
-          <p>预置流程模板和社区共享模板，一键启动方案生成</p>
+          <p>官方预置与社区共享流程模板，一键启动方案生成；点赞 / 收藏你喜欢的模板</p>
         </div>
         <button className="btn btn-primary" onClick={() => navigate('/pipeline')}><IconPlus /> 自定义流程</button>
       </div>
@@ -117,11 +161,26 @@ export default function TemplatesPage() {
                   <span><IconTemplate width={13} height={13} />{t.toolChain.length} 工具</span>
                   {t.estimatedTime && <span><IconClock width={13} height={13} />{t.estimatedTime}</span>}
                   <span>{t.usageCount} 次使用</span>
+                  {t.category === 'community' && t.ownerName && (
+                    <span className="tpl-owner"><IconUser width={12} height={12} />{t.ownerName}</span>
+                  )}
                 </div>
               </div>
               <div className="template-footer">
                 <button className="btn btn-primary btn-sm" onClick={() => useTemplate(t)}><IconPlay /> 使用模板</button>
                 <button className="btn btn-secondary btn-sm" onClick={() => preview(t)}><IconDoc /> 预览</button>
+              </div>
+              <div className="template-social">
+                <button className={`social-btn ${t.isLiked ? 'active' : ''}`} disabled={busyId === t.id}
+                  onClick={() => toggleLike(t)}>♥ {t.likeCount}</button>
+                <button className={`social-btn ${t.isFavorited ? 'active' : ''}`} disabled={busyId === t.id}
+                  onClick={() => toggleFav(t)}>★ {t.favoriteCount}</button>
+                {t.canEdit && (
+                  <button className="social-btn ghost" disabled={busyId === t.id}
+                    onClick={() => togglePublish(t)}>
+                    {t.category === 'community' ? '撤回私有' : '发布社区'}
+                  </button>
+                )}
               </div>
             </div>
           ))}

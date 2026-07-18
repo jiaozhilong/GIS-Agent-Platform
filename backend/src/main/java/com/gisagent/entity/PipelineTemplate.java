@@ -50,6 +50,23 @@ public class PipelineTemplate {
     @Column(name = "usage_count")
     private Long usageCount = 0L;
 
+    /** 作者用户 ID；官方(builtin)模板为 null */
+    @Column(name = "owner_id")
+    private Long ownerId;
+
+    @Builder.Default
+    @Column(name = "like_count")
+    private Long likeCount = 0L;
+
+    @Builder.Default
+    @Column(name = "favorite_count")
+    private Long favoriteCount = 0L;
+
+    /** 是否上架（社区模板可下架） */
+    @Builder.Default
+    @Column(name = "published")
+    private boolean published = true;
+
     @Column(nullable = false)
     private boolean builtin;
 

@@ -13,6 +13,10 @@ public interface PipelineTemplateRepository extends JpaRepository<PipelineTempla
 
     List<PipelineTemplate> findByCategory(String category);
 
+    List<PipelineTemplate> findByCategoryAndPublishedTrue(String category);
+
+    List<PipelineTemplate> findByOwnerId(Long ownerId);
+
     List<PipelineTemplate> findByBuiltinTrue();
 
     boolean existsByTemplateKey(String templateKey);
