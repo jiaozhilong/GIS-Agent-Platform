@@ -88,6 +88,25 @@ export const templateApi = {
   publish: (id: number, community: boolean) => apiClient.post(`/templates/${id}/publish?community=${community}`),
 };
 
+// ===== Team (团队空间 & RBAC) API（P4-2）=====
+export const teamApi = {
+  // 我所在的团队（含我的角色）
+  listMine: () => apiClient.get('/teams'),
+  // 创建团队（创建者自动为 OWNER）
+  create: (name: string) => apiClient.post('/teams', { name }),
+  // 团队详情 + 成员列表（需为成员）
+  detail: (id: number) => apiClient.get(`/teams/${id}`),
+  // 邀请成员：role = OWNER|ADMIN|EDITOR|MEMBER|VIEWER
+  addMember: (id: number, username: string, role: string) =>
+    apiClient.post(`/teams/${id}/members`, { username, role }),
+  // 修改成员角色
+  updateRole: (id: number, userId: number, role: string) =>
+    apiClient.put(`/teams/${id}/members/${userId}`, { role }),
+  // 移除成员
+  removeMember: (id: number, userId: number) =>
+    apiClient.delete(`/teams/${id}/members/${userId}`),
+};
+
 // ===== Project & Pipeline API =====
 export const projectApi = {
   // 项目列表

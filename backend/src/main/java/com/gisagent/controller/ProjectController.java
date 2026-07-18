@@ -4,20 +4,28 @@ import com.gisagent.dto.ProjectDto;
 import com.gisagent.entity.Project;
 import com.gisagent.entity.ProjectDocument;
 import com.gisagent.entity.PipelineRun;
+import com.gisagent.entity.Role;
+import com.gisagent.entity.TeamMember;
 import com.gisagent.repository.ProjectDocumentRepository;
 import com.gisagent.repository.ProjectRepository;
 import com.gisagent.repository.PipelineRunRepository;
+import com.gisagent.repository.TeamMemberRepository;
 import com.gisagent.repository.ToolExecutionRepository;
+import com.gisagent.service.TeamService;
 import jakarta.annotation.PostConstruct;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.io.File;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -29,6 +37,8 @@ public class ProjectController {
     private final ProjectDocumentRepository documentRepository;
     private final PipelineRunRepository pipelineRunRepository;
     private final ToolExecutionRepository toolExecutionRepository;
+    private final TeamMemberRepository teamMemberRepository;
+    private final TeamService teamService;
 
     @Value("${storage.upload-dir:./data/uploads}")
     private String uploadDir;
@@ -44,11 +54,15 @@ public class ProjectController {
     public ProjectController(ProjectRepository projectRepository,
                              ProjectDocumentRepository documentRepository,
                              PipelineRunRepository pipelineRunRepository,
-                             ToolExecutionRepository toolExecutionRepository) {
+                             ToolExecutionRepository toolExecutionRepository,
+                             TeamMemberRepository teamMemberRepository,
+                             TeamService teamService) {
         this.projectRepository = projectRepository;
         this.documentRepository = documentRepository;
         this.pipelineRunRepository = pipelineRunRepository;
         this.toolExecutionRepository = toolExecutionRepository;
+        this.teamMemberRepository = teamMemberRepository;
+        this.teamService = teamService;
     }
 
     @PostMapping
@@ -56,14 +70,21 @@ public class ProjectController {
             @RequestParam("name") String name,
             @RequestParam(value = "description", required = false) String description,
             @RequestParam("templateId") String templateId,
+            @RequestParam(value = "teamId", required = false) Long teamId,
             @RequestParam("file") MultipartFile file,
             Authentication auth) {
 
         Long userId = (Long) auth.getPrincipal();
 
+        // 若归属团队，需为该团队成员且具备 EDITOR 及以上角色方可创建项目
+        if (teamId != null) {
+            teamService.requireTeamRole(teamId, userId, Role.EDITOR);
+        }
+
         // 1. 保存项目
         Project project = Project.builder()
                 .userId(userId)
+                .teamId(teamId)
                 .name(name)
                 .description(description)
                 .templateId(templateId)
@@ -101,17 +122,23 @@ public class ProjectController {
     @GetMapping
     public ResponseEntity<?> list(Authentication auth) {
         Long userId = (Long) auth.getPrincipal();
-        return ResponseEntity.ok(projectRepository.findByUserId(userId).stream().map(this::toResponse));
+        List<Project> projects = new ArrayList<>(projectRepository.findByUserId(userId));
+        // 同时返回我作为成员所属的团队项目（与个人项目不重叠：团队项目 teamId 非空）
+        List<TeamMember> memberships = teamMemberRepository.findByUserId(userId);
+        if (!memberships.isEmpty()) {
+            List<Long> teamIds = memberships.stream().map(TeamMember::getTeamId).toList();
+            projects.addAll(projectRepository.findByTeamIdIn(teamIds));
+        }
+        return ResponseEntity.ok(projects.stream().map(this::toResponse));
     }
 
     /** 项目详情：基本信息 + 文档列表 + 最近一次流水线运行 */
     @GetMapping("/{id}")
     public ResponseEntity<?> getById(@PathVariable Long id, Authentication auth) {
         Long userId = (Long) auth.getPrincipal();
+        teamService.requireProjectRole(id, userId, Role.VIEWER);
         Project project = projectRepository.findById(id)
-                .filter(p -> p.getUserId().equals(userId))
-                .orElse(null);
-        if (project == null) return ResponseEntity.notFound().build();
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "项目不存在"));
 
         Map<String, Object> result = new java.util.HashMap<>();
         result.put("id", project.getId());
@@ -154,6 +181,7 @@ public class ProjectController {
     private ProjectDto.ProjectResponse toResponse(Project p) {
         ProjectDto.ProjectResponse r = new ProjectDto.ProjectResponse();
         r.setId(p.getId());
+        r.setTeamId(p.getTeamId());
         r.setName(p.getName());
         r.setDescription(p.getDescription());
         r.setTemplateId(p.getTemplateId());

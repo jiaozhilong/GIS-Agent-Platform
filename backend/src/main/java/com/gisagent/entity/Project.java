@@ -21,6 +21,10 @@ public class Project {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
+    /** 归属团队（团队空间）；null 表示个人项目（仅创建者可见可改） */
+    @Column(name = "team_id")
+    private Long teamId;
+
     @Column(nullable = false, length = 256)
     private String name;
 

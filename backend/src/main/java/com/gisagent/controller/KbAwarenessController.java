@@ -2,7 +2,9 @@ package com.gisagent.controller;
 
 import com.gisagent.connector.IMAKnowledgeBaseConnector;
 import com.gisagent.connector.MockIMAKnowledgeBaseConnector;
+import com.gisagent.entity.Role;
 import com.gisagent.service.KbAwarenessService;
+import com.gisagent.service.TeamService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -23,11 +25,14 @@ public class KbAwarenessController {
 
     private final KbAwarenessService kbAwarenessService;
     private final IMAKnowledgeBaseConnector imaConnector;
+    private final TeamService teamService;
 
     public KbAwarenessController(KbAwarenessService kbAwarenessService,
-                                 IMAKnowledgeBaseConnector imaConnector) {
+                                 IMAKnowledgeBaseConnector imaConnector,
+                                 TeamService teamService) {
         this.kbAwarenessService = kbAwarenessService;
         this.imaConnector = imaConnector;
+        this.teamService = teamService;
     }
 
     @PostMapping("/ima/kb-sync")
@@ -59,11 +64,8 @@ public class KbAwarenessController {
     @PostMapping("/projects/{id}/rerun-kb")
     public ResponseEntity<?> rerunWithLatestKb(@PathVariable Long id, Authentication auth) {
         Long userId = (Long) auth.getPrincipal();
-        // 仅允许用户操作自己的项目
-        var project = kbAwarenessService.findProject(id);
-        if (project == null || !project.getUserId().equals(userId)) {
-            return ResponseEntity.notFound().build();
-        }
+        // 团队项目：需 EDITOR 及以上；个人项目：仅创建者可操作
+        teamService.requireProjectRole(id, userId, Role.EDITOR);
         kbAwarenessService.regenWithLatestKb(id);
         return ResponseEntity.ok(Map.of("message", "已用最新知识库触发重生成", "projectId", id));
     }

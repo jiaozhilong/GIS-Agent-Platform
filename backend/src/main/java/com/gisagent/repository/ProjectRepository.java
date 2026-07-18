@@ -7,4 +7,5 @@ import java.util.List;
 public interface ProjectRepository extends JpaRepository<Project, Long> {
     List<Project> findByUserId(Long userId);
     List<Project> findByUserIdAndStatus(Long userId, String status);
+    List<Project> findByTeamIdIn(List<Long> teamIds);
 }

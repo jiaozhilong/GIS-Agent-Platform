@@ -20,6 +20,7 @@ public class ProjectDto {
     @Data
     public static class ProjectResponse {
         private Long id;
+        private Long teamId;
         private String name;
         private String description;
         private String templateId;

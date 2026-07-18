@@ -7,13 +7,16 @@ import com.gisagent.pipeline.PipelineEngine;
 import com.gisagent.pipeline.PipelineTool;
 import com.gisagent.pipeline.ToolContext;
 import com.gisagent.repository.*;
+import com.gisagent.service.TeamService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.io.File;
 import java.nio.file.Files;
@@ -35,6 +38,7 @@ public class PipelineController {
     private final PipelineEngine pipelineEngine;
     private final ExportService exportService;
     private final ExportRepository exportRepository;
+    private final TeamService teamService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public PipelineController(ProjectRepository projectRepository,
@@ -43,7 +47,8 @@ public class PipelineController {
                               LlmProviderRepository llmProviderRepository,
                               PipelineEngine pipelineEngine,
                               ExportService exportService,
-                              ExportRepository exportRepository) {
+                              ExportRepository exportRepository,
+                              TeamService teamService) {
         this.projectRepository = projectRepository;
         this.pipelineRunRepository = pipelineRunRepository;
         this.toolExecutionRepository = toolExecutionRepository;
@@ -51,18 +56,16 @@ public class PipelineController {
         this.pipelineEngine = pipelineEngine;
         this.exportService = exportService;
         this.exportRepository = exportRepository;
+        this.teamService = teamService;
     }
 
     /** 启动流水线执行 */
     @PostMapping("/{id}/run")
     public ResponseEntity<?> run(@PathVariable Long id, Authentication auth) {
         Long userId = (Long) auth.getPrincipal();
+        teamService.requireProjectRole(id, userId, Role.EDITOR);
         Project project = projectRepository.findById(id)
-                .filter(p -> p.getUserId().equals(userId))
-                .orElse(null);
-        if (project == null) {
-            return ResponseEntity.notFound().build();
-        }
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "项目不存在"));
 
         // 获取用户的默认 LLM Provider
         Optional<LlmProvider> providerOpt = llmProviderRepository.findByUserIdAndIsDefaultTrue(userId).stream().findFirst();
@@ -114,8 +117,7 @@ public class PipelineController {
                                               @RequestBody ProjectDto.ToolOutputUpdateRequest req,
                                               Authentication auth) {
         Long userId = (Long) auth.getPrincipal();
-        Project project = projectRepository.findById(id).filter(p -> p.getUserId().equals(userId)).orElse(null);
-        if (project == null) return ResponseEntity.notFound().build();
+        teamService.requireProjectRole(id, userId, Role.EDITOR);
 
         ToolExecution exec = toolExecutionRepository.findById(execId).orElse(null);
         if (exec == null) return ResponseEntity.notFound().build();
@@ -162,8 +164,9 @@ public class PipelineController {
     public ResponseEntity<?> rerunDownstream(@PathVariable Long id, @PathVariable Long runId,
                                              @RequestParam int fromOrder, Authentication auth) {
         Long userId = (Long) auth.getPrincipal();
-        Project project = projectRepository.findById(id).filter(p -> p.getUserId().equals(userId)).orElse(null);
-        if (project == null) return ResponseEntity.notFound().build();
+        teamService.requireProjectRole(id, userId, Role.EDITOR);
+        Project project = projectRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "项目不存在"));
 
         PipelineRun run = pipelineRunRepository.findById(runId)
                 .filter(r -> r.getProjectId().equals(id)).orElse(null);
@@ -200,10 +203,7 @@ public class PipelineController {
     @GetMapping("/{id}/status")
     public ResponseEntity<?> status(@PathVariable Long id, Authentication auth) {
         Long userId = (Long) auth.getPrincipal();
-        Project project = projectRepository.findById(id)
-                .filter(p -> p.getUserId().equals(userId))
-                .orElse(null);
-        if (project == null) return ResponseEntity.notFound().build();
+        teamService.requireProjectRole(id, userId, Role.VIEWER);
 
         PipelineRun run = pipelineRunRepository.findFirstByProjectIdOrderByIdDesc(id);
         if (run == null) {
@@ -255,10 +255,9 @@ public class PipelineController {
 
     private ResponseEntity<?> download(Long id, String type, Authentication auth) {
         Long userId = (Long) auth.getPrincipal();
+        teamService.requireProjectRole(id, userId, Role.VIEWER);
         Project project = projectRepository.findById(id)
-                .filter(p -> p.getUserId().equals(userId))
-                .orElse(null);
-        if (project == null) return ResponseEntity.notFound().build();
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "项目不存在"));
 
         PipelineRun run = pipelineRunRepository.findFirstByProjectIdOrderByIdDesc(id);
         if (run == null || run.getContextJson() == null) {

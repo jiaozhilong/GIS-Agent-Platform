@@ -35,6 +35,9 @@ export const IconTemplate = (p: IconProps) => (
 export const IconUser = (p: IconProps) => (
   <svg {...base(p)}><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-7 8-7s8 3 8 7"/></svg>
 );
+export const IconTeam = (p: IconProps) => (
+  <svg {...base(p)}><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 5.5a3 3 0 0 1 0 5.8M21 20c0-2.8-1.8-5-4.5-5.6"/></svg>
+);
 export const IconLock = (p: IconProps) => (
   <svg {...base(p)}><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
 );

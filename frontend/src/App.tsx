@@ -12,6 +12,7 @@ import LlmConfigPage from './pages/LlmConfigPage';
 import ImaConfigPage from './pages/ImaConfigPage';
 import PipelinePage from './pages/PipelinePage';
 import TemplatesPage from './pages/TemplatesPage';
+import TeamsPage from './pages/TeamsPage';
 import { useAuthStore } from './stores/authStore';
 
 function PrivateRoute({ children }: { children: ReactNode }) {
@@ -44,6 +45,7 @@ function App() {
             <Route path="settings/ima" element={<ImaConfigPage />} />
             <Route path="pipeline" element={<PipelinePage />} />
             <Route path="templates" element={<TemplatesPage />} />
+            <Route path="teams" element={<TeamsPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>

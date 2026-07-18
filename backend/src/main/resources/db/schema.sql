@@ -236,4 +236,30 @@ CREATE TABLE IF NOT EXISTS template_favorites (
 );
 CREATE INDEX IF NOT EXISTS idx_template_favorites_tpl ON template_favorites(template_id);
 
+-- ============================================================
+-- 团队空间与 RBAC（P4-2）
+-- ============================================================
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS team_id BIGINT;
+CREATE INDEX IF NOT EXISTS idx_projects_team ON projects(team_id);
+
+CREATE TABLE IF NOT EXISTS teams (
+    id          BIGSERIAL PRIMARY KEY,
+    name        VARCHAR(128) NOT NULL,
+    owner_id    BIGINT       NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at  TIMESTAMP    NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_teams_owner ON teams(owner_id);
+
+CREATE TABLE IF NOT EXISTS team_members (
+    id          BIGSERIAL PRIMARY KEY,
+    team_id     BIGINT       NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+    user_id     BIGINT       NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role        VARCHAR(16)  NOT NULL DEFAULT 'MEMBER',
+    created_at  TIMESTAMP    NOT NULL DEFAULT NOW(),
+    UNIQUE(team_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_team_members_team ON team_members(team_id);
+CREATE INDEX IF NOT EXISTS idx_team_members_user ON team_members(user_id);
+
 
