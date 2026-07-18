@@ -352,6 +352,47 @@ function ResultBody({ tool, onImprove, improving }: { tool: ToolStatus; onImprov
       </div>
     );
   }
+  if (tool.toolType === 'CASE_RECOMMEND' && Array.isArray(o)) {
+    return (
+      <div className="case-list">
+        {o.map((c: any, i: number) => (
+          <div className="case-item" key={i}>
+            <div className="case-head">
+              <span className="case-name">{c.caseName}</span>
+              {typeof c.matchScore === 'number' && (
+                <span className="score-chip">{Math.round(c.matchScore)}<i>分</i></span>
+              )}
+            </div>
+            {c.scenario && <p className="case-line"><b>场景</b> {c.scenario}</p>}
+            {c.productsUsed && <p className="case-line">{c.productsUsed}</p>}
+            {c.keyEffect && <p className="case-line case-eff">{c.keyEffect}</p>}
+            {c.matchReason && <p className="case-line case-reason">匹配点：{c.matchReason}</p>}
+            {c.referenceDoc && <span className="src-chip">📚 {c.referenceDoc}</span>}
+          </div>
+        ))}
+      </div>
+    );
+  }
+  if (tool.toolType === 'COMPETITOR_ANALYSIS' && Array.isArray(o)) {
+    return (
+      <div className="comp-list">
+        {o.map((c: any, i: number) => (
+          <div className="comp-item" key={i}>
+            <div className="comp-head">
+              <span className="comp-name">{c.competitorName}</span>
+              {typeof c.advantageScore === 'number' && (
+                <span className="score-chip adv">优势 {Math.round(c.advantageScore)}<i>分</i></span>
+              )}
+            </div>
+            {c.ourAdvantage && <p className="case-line case-eff"><b>优势</b> {c.ourAdvantage}</p>}
+            {c.ourDisadvantage && <p className="case-line"><b>注意</b> {c.ourDisadvantage}</p>}
+            {c.recommendation && <p className="case-line case-reason">建议：{c.recommendation}</p>}
+            {c.referenceDoc && <span className="src-chip">📚 {c.referenceDoc}</span>}
+          </div>
+        ))}
+      </div>
+    );
+  }
   if (tool.toolType === 'SOLUTION_QC') {
     const score = typeof o.overallScore === 'number' ? o.overallScore : 0;
     const level = o.level || (score >= 90 ? '优秀' : score >= 80 ? '良好' : score >= 70 ? '合格' : '待改进');

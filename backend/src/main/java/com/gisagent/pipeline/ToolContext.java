@@ -80,6 +80,10 @@ public class ToolContext {
         private String productsUsed;
         private String keyEffect;
         private String matchReason;
+        /** 与当前需求的相关度 0-100 */
+        private double matchScore;
+        /** 来源知识库文档（IMA 检索命中） */
+        private String referenceDoc;
     }
 
     /** Tool-4 输出：单条竞品对比 */
@@ -92,6 +96,10 @@ public class ToolContext {
         private String ourAdvantage;
         private String ourDisadvantage;
         private String recommendation;
+        /** SuperMap 优势信心分 0-100 */
+        private double advantageScore;
+        /** 来源知识库文档（IMA 检索命中） */
+        private String referenceDoc;
     }
 
     /** Tool-5 输出：架构图（Mermaid 源码 + 说明） */

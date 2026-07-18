@@ -33,10 +33,13 @@ public class CompetitorTool implements PipelineTool {
               "competitorName": "竞品名称（如 ArcGIS）",
               "ourAdvantage": "SuperMap 的优势点",
               "ourDisadvantage": "SuperMap 的相对劣势或需注意点",
-              "recommendation": "面向该需求的应对建议"
+              "recommendation": "面向该需求的应对建议",
+              "advantageScore": 88,
+              "referenceDoc": "来源知识库文档名（从检索到的资料标题中选取最相关的一条）"
             }
           ]
         }
+        说明：advantageScore 为 SuperMap 相对该竞品在本需求下的优势信心分（0-100，越高越占优）；referenceDoc 必须取自下方"知识库检索到的竞品资料"中的某条标题。
         """;
 
     public CompetitorTool(LlmService llmService, IMAKnowledgeBaseConnector imaConnector) {
@@ -68,7 +71,8 @@ public class CompetitorTool implements PipelineTool {
             知识库检索到的竞品资料：
             %s
 
-            请生成 SuperMap 与竞品的对比分析。
+            请生成 SuperMap 与竞品的对比分析。若知识库检索结果为"（无检索结果）"或"（检索失败）"，
+            请基于公开的 GIS 行业竞争认知生成对比，并将 referenceDoc 标记为"行业公开经验"。
             """.formatted(
                 context.getRequirements().getFunctional(),
                 context.getRequirements().getIndustry(),
@@ -91,6 +95,8 @@ public class CompetitorTool implements PipelineTool {
                     r.setOurAdvantage(c.path("ourAdvantage").asText());
                     r.setOurDisadvantage(c.path("ourDisadvantage").asText());
                     r.setRecommendation(c.path("recommendation").asText());
+                    r.setAdvantageScore(c.path("advantageScore").asDouble(0.0));
+                    r.setReferenceDoc(c.path("referenceDoc").asText());
                     list.add(r);
                 }
             }

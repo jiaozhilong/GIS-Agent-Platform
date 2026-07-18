@@ -34,10 +34,13 @@ public class CaseRecommendTool implements PipelineTool {
               "scenario": "适用场景/行业",
               "productsUsed": "使用的核心产品（如 SuperMap iManager、iServer）",
               "keyEffect": "项目成效或业务价值",
-              "matchReason": "与当前需求的匹配点"
+              "matchReason": "与当前需求的匹配点",
+              "matchScore": 92,
+              "referenceDoc": "来源知识库文档名（从检索到的资料标题中选取最相关的一条）"
             }
           ]
         }
+        说明：matchScore 为该案例与当前需求的相关度（0-100，越高越相关）；referenceDoc 必须取自下方"知识库检索到的案例资料"中的某条标题。
         """;
 
     public CaseRecommendTool(LlmService llmService, IMAKnowledgeBaseConnector imaConnector) {
@@ -68,7 +71,8 @@ public class CaseRecommendTool implements PipelineTool {
             知识库检索到的案例资料：
             %s
 
-            请基于以上信息推荐最相关的落地案例。
+            请基于以上信息推荐最相关的落地案例。若知识库检索结果为"（无检索结果）"或"（检索失败）"，
+            请基于 SuperMap GIS 公开的行业落地经验进行推荐，并将 referenceDoc 标记为"行业公开经验"。
             """.formatted(
                 context.getRequirements().getFunctional(),
                 context.getRequirements().getIndustry(),
@@ -91,6 +95,8 @@ public class CaseRecommendTool implements PipelineTool {
                     r.setProductsUsed(c.path("productsUsed").asText());
                     r.setKeyEffect(c.path("keyEffect").asText());
                     r.setMatchReason(c.path("matchReason").asText());
+                    r.setMatchScore(c.path("matchScore").asDouble(0.0));
+                    r.setReferenceDoc(c.path("referenceDoc").asText());
                     list.add(r);
                 }
             }
