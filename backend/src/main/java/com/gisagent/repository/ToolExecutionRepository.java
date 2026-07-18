@@ -9,4 +9,7 @@ public interface ToolExecutionRepository extends JpaRepository<ToolExecution, Lo
     List<ToolExecution> findByPipelineRunIdOrderByToolOrder(Long pipelineRunId);
 
     Optional<ToolExecution> findByPipelineRunIdAndToolOrder(Long pipelineRunId, Integer toolOrder);
+
+    // P4-4 使用数据看板聚合
+    List<ToolExecution> findByPipelineRunIdIn(List<Long> pipelineRunIds);
 }

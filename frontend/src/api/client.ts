@@ -107,6 +107,13 @@ export const teamApi = {
     apiClient.delete(`/teams/${id}/members/${userId}`),
 };
 
+// ===== 使用数据看板 API（P4-4）=====
+export const statsApi = {
+  // 概览 + 趋势 + 工具 + 模板分布；teamId 可选（团队视角，需为成员）
+  overview: (teamId?: number) =>
+    apiClient.get('/stats/overview', { params: teamId ? { teamId } : {} }),
+};
+
 // ===== Project & Pipeline API =====
 export const projectApi = {
   // 项目列表

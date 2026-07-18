@@ -607,3 +607,19 @@
   .team-detail .table-header span:nth-child(3),
   .team-detail .table-row span:nth-child(3) { display: none; }
 }
+
+/* ===== 使用数据看板（P4-4）===== */
+.chart-wrap { padding: 18px 20px 8px; }
+.trend-svg { width: 100%; height: 180px; display: block; }
+.rank-list { padding: 14px 20px 18px; display: flex; flex-direction: column; gap: 14px; }
+.rank-row { display: grid; grid-template-columns: 150px 1fr 150px; align-items: center; gap: 14px; }
+.rank-label { font-size: 13px; color: var(--text); font-weight: 560; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rank-bar-track { height: 10px; border-radius: 999px; background: rgba(255, 255, 255, .06); overflow: hidden; }
+.rank-bar { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--mint), var(--cyan)); transition: width .4s ease; }
+.rank-bar.alt { background: linear-gradient(90deg, #8fd4ff, #c5a7ff); }
+.rank-meta { font-size: 12px; color: var(--muted); text-align: right; }
+@media (max-width: 720px) {
+  .rank-row { grid-template-columns: 96px 1fr 92px; gap: 8px; }
+  .rank-label { font-size: 11.5px; }
+  .rank-meta { font-size: 10.5px; }
+}

@@ -1,13 +1,14 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import {
-  IconDashboard, IconProject, IconBrain, IconBook, IconFlow, IconTemplate, IconBrand, IconUser, IconTeam,
+  IconDashboard, IconProject, IconBrain, IconBook, IconFlow, IconTemplate, IconBrand, IconUser, IconTeam, IconStats,
 } from './ui/icons';
 
 const navItems = [
   { to: '/dashboard', label: '工作台', icon: IconDashboard, section: null },
   { to: '/projects', label: '全部项目', icon: IconProject, badge: '5', section: null },
   { to: '/teams', label: '团队空间', icon: IconTeam, section: '协作' },
+  { to: '/stats', label: '数据看板', icon: IconStats, section: '协作' },
   { to: '/settings/llm', label: '大模型配置', icon: IconBrain, section: 'AI 配置' },
   { to: '/settings/ima', label: 'IMA 知识库', icon: IconBook, section: 'AI 配置' },
   { to: '/pipeline', label: '流程编排', icon: IconFlow, section: '方案工作流' },
