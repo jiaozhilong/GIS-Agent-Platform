@@ -222,9 +222,34 @@
 .info-row:last-child { border-bottom: none; }
 .info-label { font-size: 12px; color: var(--muted-2); }
 .info-value { font-size: 13px; font-weight: 620; }
-.result-card { padding: 16px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: rgba(255, 255, 255, .02); margin-bottom: 10px; }
-.result-card h3 { font-size: 14px; font-weight: 680; margin-bottom: 8px; }
+.result-card { padding: 16px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: rgba(255, 255, 255, .02); margin-bottom: 10px; transition: border-color .2s ease; }
+.result-card:hover { border-color: var(--line-strong); }
+.result-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.result-card h3 { font-size: 14px; font-weight: 680; }
 .result-card p { font-size: 12px; color: var(--muted); line-height: 1.7; }
+.result-card-ops { display: flex; gap: 6px; flex-shrink: 0; }
+.mini-btn {
+  display: inline-flex; align-items: center; gap: 4px; padding: 4px 9px;
+  font-size: 11px; font-weight: 640; color: var(--muted); cursor: pointer;
+  border: 1px solid var(--line); border-radius: 8px; background: rgba(255, 255, 255, .03);
+  transition: .2s ease;
+}
+.mini-btn:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); background: rgba(146, 246, 190, .08); }
+.mini-btn:disabled { opacity: .5; cursor: not-allowed; }
+.mini-btn svg { width: 13px; height: 13px; }
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+
+/* 编辑中间产物模态 */
+.modal-hint { font-size: 12px; color: var(--muted-2); line-height: 1.7; margin-bottom: 10px; }
+.edit-textarea {
+  width: 100%; min-height: 260px; max-height: 52vh; resize: vertical;
+  padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-sm);
+  color: var(--text); background: rgba(255, 255, 255, .035);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 12.5px; line-height: 1.6; outline: none;
+}
+.edit-textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(146, 246, 190, .12); }
 .tag-mint { color: var(--mint); background: rgba(146, 246, 190, .08); }
 .tag-cyan { color: var(--cyan); background: rgba(94, 230, 225, .08); }
 .tag-amber { color: var(--amber); background: rgba(255, 200, 111, .08); }

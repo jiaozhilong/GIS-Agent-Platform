@@ -108,6 +108,94 @@ public class PipelineController {
         return ResponseEntity.ok(resp);
     }
 
+    /** 编辑某个中间产物（更新其 outputJson，并同步回注到本次运行的 contextJson） */
+    @PutMapping("/{id}/tools/{execId}")
+    public ResponseEntity<?> updateToolOutput(@PathVariable Long id, @PathVariable Long execId,
+                                              @RequestBody ProjectDto.ToolOutputUpdateRequest req,
+                                              Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        Project project = projectRepository.findById(id).filter(p -> p.getUserId().equals(userId)).orElse(null);
+        if (project == null) return ResponseEntity.notFound().build();
+
+        ToolExecution exec = toolExecutionRepository.findById(execId).orElse(null);
+        if (exec == null) return ResponseEntity.notFound().build();
+        PipelineRun run = pipelineRunRepository.findById(exec.getPipelineRunId()).orElse(null);
+        if (run == null || !run.getProjectId().equals(id)) return ResponseEntity.notFound().build();
+
+        if (req.getOutput() == null || req.getOutput().isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "产物内容不能为空"));
+        }
+        // 解析为合法 JSON（对象/数组）或裸文本（SOLUTION_OUTPUT 的 Markdown）
+        String outputJson;
+        String trimmed = req.getOutput().trim();
+        try {
+            if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+                objectMapper.readValue(trimmed, Object.class); // 仅校验
+                outputJson = trimmed;
+            } else {
+                outputJson = objectMapper.writeValueAsString(trimmed); // 裸文本 → JSON 字符串
+            }
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "产物内容不是合法 JSON"));
+        }
+
+        exec.setOutputJson(outputJson);
+        toolExecutionRepository.save(exec);
+
+        // 同步回注到本次运行的 contextJson，使方案预览/下载立即反映编辑
+        if (run.getContextJson() != null) {
+            ToolContext ctx = parseContext(run.getContextJson());
+            pipelineEngine.injectOutput(ctx, exec.getToolType(), outputJson);
+            try {
+                run.setContextJson(objectMapper.writeValueAsString(ctx.toMap()));
+            } catch (Exception e) {
+                log.warn("context 序列化失败", e);
+            }
+            pipelineRunRepository.save(run);
+        }
+
+        return ResponseEntity.ok(Map.of("message", "已保存", "execId", execId, "toolType", exec.getToolType()));
+    }
+
+    /** 重跑下游：从指定节点的下一节点开始重新执行（该节点本身不重跑，使用其已编辑产物） */
+    @PostMapping("/{id}/runs/{runId}/rerun")
+    public ResponseEntity<?> rerunDownstream(@PathVariable Long id, @PathVariable Long runId,
+                                             @RequestParam int fromOrder, Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        Project project = projectRepository.findById(id).filter(p -> p.getUserId().equals(userId)).orElse(null);
+        if (project == null) return ResponseEntity.notFound().build();
+
+        PipelineRun run = pipelineRunRepository.findById(runId)
+                .filter(r -> r.getProjectId().equals(id)).orElse(null);
+        if (run == null) return ResponseEntity.notFound().build();
+
+        Optional<LlmProvider> providerOpt = llmProviderRepository.findByUserIdAndIsDefaultTrue(userId).stream().findFirst();
+        if (providerOpt.isEmpty()) providerOpt = llmProviderRepository.findByUserId(userId).stream().findFirst();
+        if (providerOpt.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "请先配置 LLM Provider"));
+        }
+        LlmProvider provider = providerOpt.get();
+        PipelineTool.LlmConfig llmConfig = PipelineTool.LlmConfig.of(
+                provider.getEndpoint(), provider.getApiKeyEncrypted(), defaultModel(provider));
+
+        Long pid = id;
+        String templateId = project.getTemplateId();
+        final PipelineRun finalRun = run;
+        new Thread(() -> {
+            try {
+                pipelineEngine.rerunDownstream(runId, pid, templateId, fromOrder, llmConfig);
+            } catch (Exception e) {
+                log.error("下游重跑异常", e);
+                finalRun.setStatus("FAILED");
+                finalRun.setErrorMessage(e.getMessage());
+                finalRun.setFinishedAt(Instant.now());
+                pipelineRunRepository.save(finalRun);
+            }
+        }).start();
+
+        return ResponseEntity.ok(Map.of("message", "下游重跑已启动", "fromOrder", fromOrder, "runId", runId));
+    }
+
     /** 查询流水线状态 */
     @GetMapping("/{id}/status")
     public ResponseEntity<?> status(@PathVariable Long id, Authentication auth) {
@@ -130,6 +218,7 @@ public class PipelineController {
         List<ProjectDto.ToolStatusDto> tools = new ArrayList<>();
         for (ToolExecution exec : toolExecutionRepository.findByPipelineRunIdOrderByToolOrder(run.getId())) {
             ProjectDto.ToolStatusDto t = new ProjectDto.ToolStatusDto();
+            t.setExecId(exec.getId());
             t.setToolType(exec.getToolType());
             t.setToolOrder(exec.getToolOrder());
             t.setStatus(exec.getStatus());

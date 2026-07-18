@@ -1,6 +1,7 @@
 package com.gisagent.pipeline;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gisagent.entity.*;
 import com.gisagent.export.ExportService;
@@ -182,6 +183,100 @@ public class PipelineEngine {
     }
 
     /**
+     * 将某个工具节点的产物（已编辑的 outputJson）回注到 Context Bus 对应字段，
+     * 供下游节点重跑时消费。
+     */
+    public void injectOutput(ToolContext ctx, String toolType, String outputJson) {
+        if (outputJson == null) return;
+        try {
+            switch (toolType) {
+                case "REQUIREMENT_ANALYSIS" ->
+                        ctx.setRequirements(objectMapper.readValue(outputJson, ToolContext.RequirementResult.class));
+                case "PRODUCT_MATCHING" ->
+                        ctx.setProductSelection(readListOrSingle(outputJson, ToolContext.ProductSelection.class));
+                case "CASE_RECOMMEND" ->
+                        ctx.setCaseRecommendations(readListOrSingle(outputJson, ToolContext.CaseRecommendation.class));
+                case "COMPETITOR_ANALYSIS" ->
+                        ctx.setCompetitorAnalysis(readListOrSingle(outputJson, ToolContext.CompetitorComparison.class));
+                case "ARCHITECTURE_DIAGRAM" ->
+                        ctx.setArchitectureDiagram(objectMapper.readValue(outputJson, ToolContext.ArchitectureDiagram.class));
+                case "SOLUTION_OUTLINE" ->
+                        ctx.setSolutionOutline(objectMapper.readValue(outputJson, ToolContext.SolutionOutline.class));
+                case "SOLUTION_QC" ->
+                        ctx.setQualityCheck(objectMapper.readValue(outputJson, ToolContext.QualityCheck.class));
+                case "SOLUTION_OUTPUT" -> {
+                    // 可能为 JSON 字符串或裸文本
+                    String text = outputJson.trim();
+                    if (text.startsWith("\"") && text.endsWith("\"")) {
+                        try { ctx.setSolutionText(objectMapper.readValue(text, String.class)); }
+                        catch (Exception e) { ctx.setSolutionText(text); }
+                    } else {
+                        ctx.setSolutionText(text);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("产物回注失败: {} - {}", toolType, e.getMessage());
+        }
+    }
+
+    /**
+     * 重跑下游：从 fromOrder 之后（不含 fromOrder）的所有节点重新执行，
+     * 执行前先将 fromOrder 节点（已被手动编辑）的产物回注 Context Bus，
+     * 使下游基于编辑后的结果重新生成。
+     *
+     * @param fromOrder 被编辑节点的 toolOrder（该节点本身不重跑）
+     */
+    public void rerunDownstream(Long pipelineRunId, Long projectId, String templateId,
+                                int fromOrder, PipelineTool.LlmConfig llmConfig) {
+        PipelineRun run = pipelineRunRepository.findById(pipelineRunId)
+                .orElseThrow(() -> new IllegalArgumentException("流水线不存在"));
+
+        ToolContext parsed = parseContext(run.getContextJson());
+        final ToolContext ctx = parsed != null ? parsed : ToolContext.empty();
+
+        // 回注被编辑节点的产物
+        toolExecutionRepository.findByPipelineRunIdAndToolOrder(pipelineRunId, fromOrder)
+                .ifPresent(edited -> injectOutput(ctx, edited.getToolType(), edited.getOutputJson()));
+
+        List<ToolExecution> downstream = toolExecutionRepository
+                .findByPipelineRunIdOrderByToolOrder(pipelineRunId).stream()
+                .filter(e -> e.getToolOrder() > fromOrder)
+                .toList();
+
+        boolean anyFailed = false;
+        for (ToolExecution exec : downstream) {
+            final ToolExecution fx = exec;
+            PipelineTool tool = TOOL_BY_TYPE.get(fx.getToolType());
+            if (tool == null) continue;
+            fx.setStatus("RUNNING");
+            fx.setStartedAt(Instant.now());
+            fx.setLlmModel(llmConfig.model);
+            toolExecutionRepository.save(fx);
+
+            boolean success;
+            try {
+                success = tool.execute(ctx, llmConfig);
+            } catch (Exception e) {
+                log.error("重跑工具异常: {}", exec.getToolType(), e);
+                success = false;
+            }
+            exec.setFinishedAt(Instant.now());
+            exec.setStatus(success ? "SUCCESS" : "FAILED");
+            exec.setOutputJson(toJson(safeOutput(ctx, exec.getToolType())));
+            toolExecutionRepository.save(exec);
+            if (!success) anyFailed = true;
+        }
+
+        run.setContextJson(toJson(ctx.toMap()));
+        run.setFinishedAt(Instant.now());
+        run.setStatus(anyFailed ? "PARTIAL" : "SUCCESS");
+        pipelineRunRepository.save(run);
+        log.info("下游重跑完成: runId={}, fromOrder={}, 下游节点数={}, status={}",
+                pipelineRunId, fromOrder, downstream.size(), run.getStatus());
+    }
+
+    /**
      * 生成导出文件（在流水线成功后调用）。
      */
     public void export(Long projectId, String projectName, Long pipelineRunId) {
@@ -224,6 +319,32 @@ public class PipelineEngine {
         } catch (Exception e) {
             return ToolContext.empty();
         }
+    }
+
+    /**
+     * 将产物 JSON 解析为 List<T>；兼容两种编辑输入：
+     * - JSON 数组（前端整列表编辑）—— 直接反序列化；
+     * - 单个 JSON 对象（前端仅编辑其中一项）—— 自动包成 1 元素列表。
+     * 既避免 injectOutput 因格式不符静默失败，也保证手动编辑能回注 Context Bus。
+     */
+    private <T> List<T> readListOrSingle(String outputJson, Class<T> elementClass) {
+        try {
+            JsonNode node = objectMapper.readTree(outputJson);
+            if (node.isArray()) {
+                return objectMapper.convertValue(node,
+                        objectMapper.getTypeFactory().constructCollectionType(List.class, elementClass));
+            }
+            if (node.isObject()) {
+                return List.of(objectMapper.convertValue(node, elementClass));
+            }
+            if (node.isTextual()) {
+                // 列表型产物偶尔以纯文本给出，退化为空列表以避免打断重跑
+                return List.of();
+            }
+        } catch (Exception e) {
+            log.warn("列表型产物解析失败: {}", e.getMessage());
+        }
+        return List.of();
     }
 
     private String toJson(Object obj) {

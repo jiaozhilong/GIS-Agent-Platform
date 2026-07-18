@@ -30,7 +30,13 @@
 - **后端**：`PipelineTemplateController` 新增 `POST /api/templates`（保存自定义模板，自动生成 `mine_<uuid>` 键、`category=mine`、`builtin=false`，校验名称非空与工具类型合法）与 `DELETE /api/templates/{key}`（仅允许删 `mine` 模板，防误删内置）。新增 `TemplateSaveRequest` DTO。
 - **前端**：`PipelinePage` 增加编辑模式（左侧工具链编辑器增删/上下移节点，画布实时预览）、保存模态（名称+说明+工具链预览）、模板分类 Tab（全部/内置/我的）、自定义模板删除按钮；`client.ts` 增加 `templateApi.create/remove`。
 - **验证**：API 级（保存 201 / 校验 400 / 删除 200）+ 无头 UI 链路（登录→编辑→加节点→保存→「我的」出现→用此模板新建方案）全绿，0 控制台错误。自定义模板经 `PipelineEngine.resolveTools(templateKey)` 可被真实 `run` 执行。
-- **未做（后续 P3 项）**：P3-1 知识库自动感知、P3-3 中间产物编辑重跑、P3-4 方案质检增强、P3-5 案例/竞品增强、P3-6 联调验收。
+- **未做（后续 P3 项）**：P3-1 知识库自动感知、P3-4 方案质检增强、P3-5 案例/竞品增强、P3-6 联调验收。
+
+### ✅ P3-3 中间产物手动编辑 + 重跑下游（2026-07-18）
+- **后端**：`PipelineController` 新增 `PUT /api/projects/{id}/tools/{execId}`（更新单个中间产物 `outputJson`，并**同步回注**到本次运行的 `contextJson`，使方案预览/下载立即反映编辑）与 `POST /api/projects/{id}/runs/{runId}/rerun?fromOrder=N`（异步重跑 `fromOrder` 之后所有下游节点，执行前先回注被编辑节点的产物，基于编辑后结果重新生成）。`PipelineEngine.injectOutput()` 增强：列表型产物（`PRODUCT_MATCHING`/`CASE_RECOMMEND`/`COMPETITOR_ANALYSIS`）兼容「单对象自动包成 1 元素列表」，避免手动编辑因格式不符被静默吞掉。`ToolExecutionRepository.findByPipelineRunIdAndToolOrder`、DTO `ToolOutputUpdateRequest`、前端 `toolApi.updateOutput` / `projectApi.rerun` 配套。
+- **前端**：`ProjectDetailPage` 每个中间产物卡片增加「编辑」「重跑下游」按钮（末节点隐藏重跑）；编辑打开 `Modal`，`outputToText()` 将产物转为可编辑 JSON/Markdown，保存后轮询并刷新；`isLast()` 控制末节点。
+- **验证**：端到端 `p3_verify.py` 全绿——`full_solution` 跑出 8/8 SUCCESS → 编辑 order=1（`PRODUCT_MATCHING`）单对象 → context `productSelection` 立即变为编辑值 → `rerun?fromOrder=1` 重跑 order 2–7 全部 SUCCESS → 编辑产品名 `SuperMap iManager` 出现在下游 2–7 全部产物中（竞品/架构/大纲/质检/方案输出均基于编辑结果重生成）。`npm run build` + 后端 `mvn package` 均通过。
+- **未做（后续 P3 项）**：P3-1 知识库自动感知、P3-4 方案质检增强、P3-5 案例/竞品增强、P3-6 联调验收。
 
 ## 验证结果
 - `npm run build`：tsc 严格模式 + vite 构建通过

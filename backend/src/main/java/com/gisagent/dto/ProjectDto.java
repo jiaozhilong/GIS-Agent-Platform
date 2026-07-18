@@ -36,11 +36,19 @@ public class ProjectDto {
 
     @Data
     public static class ToolStatusDto {
+        private Long execId;
         private String toolType;
         private Integer toolOrder;
         private String status;
         private Object output;
         private String errorMessage;
+    }
+
+    /** 编辑中间产物请求体 */
+    @Data
+    public static class ToolOutputUpdateRequest {
+        /** 编辑后的产物内容：合法 JSON（对象/数组）；SOLUTION_OUTPUT 也可直接传 Markdown 文本 */
+        private String output;
     }
 
     @Data

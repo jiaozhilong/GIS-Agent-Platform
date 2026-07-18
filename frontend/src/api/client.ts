@@ -90,6 +90,10 @@ export const projectApi = {
   // 查询流水线状态
   status: (id: number) => apiClient.get(`/projects/${id}/status`),
 
+  // 重跑下游：从指定节点（toolOrder）之后重新执行
+  rerun: (id: number, runId: number, fromOrder: number) =>
+    apiClient.post(`/projects/${id}/runs/${runId}/rerun?fromOrder=${fromOrder}`),
+
   // 下载 Markdown
   downloadMd: (id: number) =>
     apiClient.get(`/projects/${id}/download/md`, { responseType: 'blob' }),
@@ -101,6 +105,13 @@ export const projectApi = {
   // 下载 PPT
   downloadPptx: (id: number) =>
     apiClient.get(`/projects/${id}/download/pptx`, { responseType: 'blob' }),
+};
+
+// ===== Tool Execution API（中间产物编辑）=====
+export const toolApi = {
+  // 编辑单个中间产物（execId 对应某次运行的工具执行记录）
+  updateOutput: (projectId: number, execId: number, output: string) =>
+    apiClient.put(`/projects/${projectId}/tools/${execId}`, { output }),
 };
 
 // 触发浏览器下载 blob

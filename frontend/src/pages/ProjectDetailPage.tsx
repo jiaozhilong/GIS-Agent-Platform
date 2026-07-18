@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { projectApi, downloadBlob } from '../api/client';
+import { projectApi, toolApi, downloadBlob } from '../api/client';
 import { useToast } from '../components/ui/Toast';
+import { Modal } from '../components/ui/Modal';
 import {
   IconProject, IconDownload, IconPlay, IconEdit,
-  IconDoc, IconSearch, IconBrain, IconTemplate, IconCheck,
+  IconDoc, IconSearch, IconBrain, IconTemplate, IconCheck, IconSync,
 } from '../components/ui/icons';
 import { effectiveStatus, STATUS_LABEL, templateLabel, fmtDate, type EffStatus } from '../utils/status';
 
-interface ToolStatus { toolType: string; toolOrder: number; status: string; output?: any; errorMessage?: string; }
+interface ToolStatus { execId: number; toolType: string; toolOrder: number; status: string; output?: any; errorMessage?: string; }
 interface Detail { id: number; name: string; description?: string; templateId?: string; status: string; createdAt?: string; documents?: any[]; latestRun?: { id: number; status: string; tools: ToolStatus[] }; }
 
 const STEP_DEFS = [
@@ -25,6 +26,13 @@ const TOOL_LABEL: Record<string, string> = {
   SOLUTION_QC: '方案质检', SOLUTION_OUTPUT: '方案输出', PPT_OUTPUT: 'PPT 输出',
 };
 
+/** 将产物转为可编辑文本：对象/数组 → 美化 JSON；字符串（如最终方案 Markdown）→ 原文 */
+function outputToText(output: any): string {
+  if (output == null) return '';
+  if (typeof output === 'string') return output;
+  try { return JSON.stringify(output, null, 2); } catch { return String(output); }
+}
+
 export default function ProjectDetailPage() {
   const { id } = useParams();
   const projectId = Number(id);
@@ -38,6 +46,12 @@ export default function ProjectDetailPage() {
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const pollRef = useRef<number | null>(null);
+
+  // 编辑模态
+  const [editTarget, setEditTarget] = useState<ToolStatus | null>(null);
+  const [editText, setEditText] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [rerunning, setRerunning] = useState<number | null>(null);
 
   const loadOnce = async () => {
     try {
@@ -60,6 +74,7 @@ export default function ProjectDetailPage() {
       setContext(data.context || null);
       if (['SUCCESS', 'PARTIAL', 'FAILED'].includes(data.status)) {
         setRunning(false);
+        setRerunning(null);
         if (pollRef.current) window.clearInterval(pollRef.current);
       }
     } catch { /* ignore */ }
@@ -104,6 +119,42 @@ export default function ProjectDetailPage() {
     }
   };
 
+  // ===== 编辑中间产物 =====
+  const openEdit = (t: ToolStatus) => {
+    setEditTarget(t);
+    setEditText(outputToText(t.output));
+  };
+  const confirmEdit = async () => {
+    if (!editTarget) return;
+    setSavingEdit(true);
+    try {
+      await toolApi.updateOutput(projectId, editTarget.execId, editText);
+      showToast('中间产物已保存，方案预览已同步更新');
+      setEditTarget(null);
+      await poll();
+    } catch (e: any) {
+      showToast(e.response?.data?.error || '保存失败，请检查格式', true);
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  // ===== 重跑下游 =====
+  const handleRerun = async (t: ToolStatus) => {
+    setRerunning(t.toolOrder);
+    try {
+      const runId = (await projectApi.status(projectId)).data?.pipelineRunId;
+      if (!runId) { showToast('未找到运行记录', true); setRerunning(null); return; }
+      await projectApi.rerun(projectId, runId, t.toolOrder);
+      showToast(`已从「${TOOL_LABEL[t.toolType] || t.toolType}」之后重跑下游`);
+      if (pollRef.current) window.clearInterval(pollRef.current);
+      pollRef.current = window.setInterval(poll, 3000);
+    } catch (e: any) {
+      showToast(e.response?.data?.error || '重跑启动失败', true);
+      setRerunning(null);
+    }
+  };
+
   if (loading && !detail) {
     return <div className="empty-state"><p>加载中…</p></div>;
   }
@@ -111,6 +162,7 @@ export default function ProjectDetailPage() {
   const es: EffStatus = effectiveStatus(detail?.status, runStatus === 'NO_RUN' ? undefined : runStatus);
   const done = ['SUCCESS', 'PARTIAL'].includes(runStatus);
   const failed = runStatus === 'FAILED';
+  const hasRun = runStatus !== 'NO_RUN';
 
   // 工作流步骤状态
   const stepStates = STEP_DEFS.map((s) => {
@@ -122,6 +174,7 @@ export default function ProjectDetailPage() {
   const trackWidth = `${Math.min(100, ((activeIdx >= 0 ? activeIdx : doneCount) / STEP_DEFS.length) * 100)}%`;
 
   const doc = detail?.documents?.[0];
+  const isLast = (order: number) => tools.length > 0 && order === Math.max(...tools.map((t) => t.toolOrder));
 
   return (
     <div>
@@ -183,14 +236,28 @@ export default function ProjectDetailPage() {
 
         {/* Intermediate results */}
         <div className="panel">
-          <div className="panel-head"><h2>中间产物</h2></div>
+          <div className="panel-head">
+            <h2>中间产物</h2>
+            {hasRun && <span className="badge badge-cyan">可编辑 / 重跑下游</span>}
+          </div>
           <div className="panel-body">
             {tools.length === 0 ? (
               <div className="empty-state"><p>运行流水线后，这里将展示各工具的分析结果</p></div>
             ) : (
               tools.filter((t) => t.output).map((t) => (
                 <div className="result-card" key={t.toolOrder}>
-                  <h3>{t.status === 'SUCCESS' ? '✅ ' : t.status === 'FAILED' ? '⚠️ ' : '🔄 '}{TOOL_LABEL[t.toolType] || t.toolType}</h3>
+                  <div className="result-card-head">
+                    <h3>{t.status === 'SUCCESS' ? '✅ ' : t.status === 'FAILED' ? '⚠️ ' : '🔄 '}{TOOL_LABEL[t.toolType] || t.toolType}</h3>
+                    <div className="result-card-ops">
+                      <button className="mini-btn" title="编辑产物" onClick={() => openEdit(t)}><IconEdit width={13} height={13} /> 编辑</button>
+                      {!isLast(t.toolOrder) && (
+                        <button className="mini-btn" title="重跑该节点之后的下游" disabled={rerunning !== null}
+                          onClick={() => handleRerun(t)}>
+                          {rerunning === t.toolOrder ? <IconSync width={13} height={13} className="spin" /> : <IconSync width={13} height={13} />} 重跑下游
+                        </button>
+                      )}
+                    </div>
+                  </div>
                   <ResultBody tool={t} />
                 </div>
               ))
@@ -232,6 +299,27 @@ export default function ProjectDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* 编辑中间产物模态 */}
+      <Modal
+        open={editTarget !== null}
+        title={`编辑中间产物 · ${editTarget ? TOOL_LABEL[editTarget.toolType] || editTarget.toolType : ''}`}
+        onClose={() => !savingEdit && setEditTarget(null)}
+        footer={
+          <>
+            <button className="btn btn-secondary btn-sm" onClick={() => setEditTarget(null)} disabled={savingEdit}>取消</button>
+            <button className="btn btn-primary btn-sm" onClick={confirmEdit} disabled={savingEdit}>
+              {savingEdit ? '保存中…' : '保存'}
+            </button>
+          </>
+        }
+      >
+        <p className="modal-hint">
+          编辑产物内容后点击保存，方案预览与下载将立即同步更新；如需让后续节点基于本次修改重新生成，请保存后点「重跑下游」。
+        </p>
+        <textarea className="edit-textarea" value={editText} onChange={(e) => setEditText(e.target.value)}
+          placeholder={editTarget?.toolType === 'SOLUTION_OUTPUT' ? '直接编辑 Markdown 方案文本' : '编辑 JSON 产物内容'} />
+      </Modal>
     </div>
   );
 }
@@ -257,7 +345,7 @@ function ResultBody({ tool }: { tool: ToolStatus }) {
       </div>
     );
   }
-  if (typeof o === 'string') return <p>{o}</p>;
+  if (typeof o === 'string') return <p style={{ whiteSpace: 'pre-wrap' }}>{o}</p>;
   try {
     return <p>{JSON.stringify(o).slice(0, 200)}</p>;
   } catch {
