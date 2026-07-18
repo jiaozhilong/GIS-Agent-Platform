@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { projectApi, imaApi, llmApi } from '../api/client';
+import { projectApi, imaApi, llmApi, skillApi } from '../api/client';
 import { useToast } from '../components/ui/Toast';
 import {
   IconProject, IconCheck, IconBrain, IconBook,
@@ -39,6 +39,7 @@ export default function DashboardPage() {
   const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [kbCount, setKbCount] = useState(0);
   const [providerCount, setProviderCount] = useState(0);
+  const [skillCount, setSkillCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<'all' | 'running' | 'done'>('all');
   const [search, setSearch] = useState('');
@@ -49,10 +50,11 @@ export default function DashboardPage() {
     let cancelled = false;
     (async () => {
       try {
-        const [projRes, kbRes, provRes] = await Promise.all([
+        const [projRes, kbRes, provRes, skillRes] = await Promise.all([
           projectApi.list(),
           imaApi.listConfigs(),
           llmApi.list(),
+          skillApi.list(),
         ]);
         if (cancelled) return;
         const list: ProjectItem[] = (projRes.data || []).map((p: any) => ({
@@ -75,6 +77,7 @@ export default function DashboardPage() {
         setProjects(list);
         setKbCount((kbRes.data || []).length);
         setProviderCount((provRes.data || []).length);
+        setSkillCount((skillRes.data?.total) ?? 0);
       } catch (err: any) {
         if (!cancelled) showToast(err.response?.data?.error || '数据加载失败', true);
       } finally {
@@ -134,7 +137,7 @@ export default function DashboardPage() {
       <div className="stats-row">
         <StatCard label="进行中项目" value={stats.running} color="mint" icon={<IconProject />} change={`共 ${projects.length} 个项目`} />
         <StatCard label="已完成方案" value={stats.done} color="cyan" icon={<IconCheck />} change="流水线已交付" />
-        <StatCard label="可编排 Skills" value={12} color="amber" icon={<IconFlow />} change="平台内置能力" />
+        <StatCard label="可编排 Skills" value={skillCount ?? 0} color="amber" icon={<IconFlow />} change="平台内置能力" />
         <StatCard label="知识库连接" value={kbCount} color="purple" icon={<IconBook />} change={kbCount > 0 ? '全部在线' : '待配置'} />
       </div>
 

@@ -60,6 +60,11 @@ export const imaApi = {
   kbSimulate: () => apiClient.post('/ima/kb-simulate'),
 };
 
+// ===== Skills (可编排能力) API =====
+export const skillApi = {
+  list: () => apiClient.get('/skills'),
+};
+
 // ===== Template (流程模板) API =====
 export const templateApi = {
   // 模板列表，可选 category 过滤（official/community/mine）
