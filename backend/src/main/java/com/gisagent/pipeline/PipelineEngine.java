@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gisagent.entity.*;
+import com.gisagent.entity.ProjectVersion;
 import com.gisagent.export.ExportService;
 import com.gisagent.repository.*;
 import com.gisagent.service.LlmService;
@@ -37,6 +38,7 @@ public class PipelineEngine {
     private final ProjectDocumentRepository projectDocumentRepository;
     private final ExportService exportService;
     private final PipelineTemplateRepository templateRepository;
+    private final com.gisagent.service.ProjectVersionService versionService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /** toolType → 实际工具实例，用于按模板工具链解析 */
@@ -57,7 +59,8 @@ public class PipelineEngine {
                           ToolExecutionRepository toolExecutionRepository,
                           ProjectDocumentRepository projectDocumentRepository,
                           ExportService exportService,
-                          PipelineTemplateRepository templateRepository) {
+                          PipelineTemplateRepository templateRepository,
+                          com.gisagent.service.ProjectVersionService versionService) {
         this.requirementAnalysisTool = requirementAnalysisTool;
         this.productMatchingTool = productMatchingTool;
         this.caseRecommendTool = caseRecommendTool;
@@ -71,6 +74,7 @@ public class PipelineEngine {
         this.projectDocumentRepository = projectDocumentRepository;
         this.exportService = exportService;
         this.templateRepository = templateRepository;
+        this.versionService = versionService;
 
         TOOL_BY_TYPE.put("REQUIREMENT_ANALYSIS", requirementAnalysisTool);
         TOOL_BY_TYPE.put("PRODUCT_MATCHING", productMatchingTool);
@@ -98,7 +102,8 @@ public class PipelineEngine {
      * @param templateId    模板 key
      * @param llmConfig     LLM 配置
      */
-    public void run(Long pipelineRunId, Long projectId, String templateId, PipelineTool.LlmConfig llmConfig) {
+    public void run(Long pipelineRunId, Long projectId, String templateId, PipelineTool.LlmConfig llmConfig,
+                    String triggerType) {
         PipelineRun run = pipelineRunRepository.findById(pipelineRunId)
                 .orElseThrow(() -> new IllegalArgumentException("流水线不存在"));
 
@@ -151,6 +156,16 @@ public class PipelineEngine {
         run.setFinishedAt(Instant.now());
         run.setContextJson(toJson(context.toMap()));
         pipelineRunRepository.save(run);
+
+        // 版本快照：仅在生成成功/部分成功时留档（失败不快照）
+        if (!"FAILED".equals(run.getStatus())) {
+            try {
+                ProjectVersion v = versionService.snapshot(projectId, run.getContextJson(), triggerType, null, null);
+                if (v != null) log.info("已自动保存版本快照 v{} (trigger={})", v.getVersionNo(), triggerType);
+            } catch (Exception e) {
+                log.warn("版本快照保存失败（不影响主流程）: {}", e.getMessage());
+            }
+        }
 
         log.info("流水线执行完成: runId={}, status={}", pipelineRunId, run.getStatus());
     }
@@ -228,7 +243,7 @@ public class PipelineEngine {
      * @param fromOrder 被编辑节点的 toolOrder（该节点本身不重跑）
      */
     public void rerunDownstream(Long pipelineRunId, Long projectId, String templateId,
-                                int fromOrder, PipelineTool.LlmConfig llmConfig) {
+                                int fromOrder, PipelineTool.LlmConfig llmConfig, String triggerType) {
         PipelineRun run = pipelineRunRepository.findById(pipelineRunId)
                 .orElseThrow(() -> new IllegalArgumentException("流水线不存在"));
 
@@ -272,6 +287,17 @@ public class PipelineEngine {
         run.setFinishedAt(Instant.now());
         run.setStatus(anyFailed ? "PARTIAL" : "SUCCESS");
         pipelineRunRepository.save(run);
+
+        // 版本快照：下游重跑成功后留档
+        if (!"FAILED".equals(run.getStatus())) {
+            try {
+                ProjectVersion v = versionService.snapshot(projectId, run.getContextJson(), triggerType, null, null);
+                if (v != null) log.info("已自动保存版本快照 v{} (trigger={})", v.getVersionNo(), triggerType);
+            } catch (Exception e) {
+                log.warn("版本快照保存失败（不影响主流程）: {}", e.getMessage());
+            }
+        }
+
         log.info("下游重跑完成: runId={}, fromOrder={}, 下游节点数={}, status={}",
                 pipelineRunId, fromOrder, downstream.size(), run.getStatus());
     }

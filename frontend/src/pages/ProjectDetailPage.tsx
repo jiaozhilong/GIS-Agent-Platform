@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { projectApi, toolApi, downloadBlob } from '../api/client';
 import { useToast } from '../components/ui/Toast';
 import { Modal } from '../components/ui/Modal';
+import VersionPanel from '../components/VersionPanel';
 import {
   IconProject, IconDownload, IconPlay, IconEdit,
   IconDoc, IconSearch, IconBrain, IconTemplate, IconCheck, IconSync,
@@ -335,6 +336,9 @@ export default function ProjectDetailPage() {
             </div>
           </div>
         </div>
+
+        {/* 方案版本管理（P4-3）：快照 / 历史 / 一键回退 */}
+        <VersionPanel projectId={projectId} onRestored={() => { loadOnce(); poll(); }} />
       </div>
 
       {/* 编辑中间产物模态 */}

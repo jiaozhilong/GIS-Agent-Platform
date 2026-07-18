@@ -193,3 +193,20 @@ ALTER TABLE projects ADD COLUMN IF NOT EXISTS kb_dirty_since TIMESTAMP;
 CREATE INDEX IF NOT EXISTS idx_kb_sync_states_user ON kb_sync_states(user_id);
 CREATE INDEX IF NOT EXISTS idx_projects_kb_dirty ON projects(user_id, kb_dirty);
 
+-- ============================================================
+-- 方案版本快照（P4-3 版本管理）
+-- ============================================================
+CREATE TABLE IF NOT EXISTS project_versions (
+    id              BIGSERIAL PRIMARY KEY,
+    project_id      BIGINT       NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    version_no      INT          NOT NULL DEFAULT 1,         -- 项目内自增版本号
+    title           VARCHAR(128),
+    trigger_type    VARCHAR(32),                            -- AUTO_RUN | KB_RERUN | MANUAL
+    context_json    JSONB,                                  -- 完整 Context Bus 快照
+    solution_text   TEXT,                                   -- 方案正文冗余副本（列表预览/对比）
+    note            TEXT,
+    created_at      TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_project_versions_project ON project_versions(project_id);
+

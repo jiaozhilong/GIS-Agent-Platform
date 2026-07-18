@@ -73,8 +73,15 @@
 
 > P0 功能收尾（F-A~F-E）全部完成。后续"功能全做完并走通"需在**用户联网环境**运行 `python3 p4_acceptance.py`（配置 DeepSeek + IMA 真实凭证，后端设 `IMA_MOCK_ENABLED=false`）全绿方为终态。
 
-### Phase 4 生态化（开发计划 P4-1~5，完全未做）
-P4-1 模板市场社区共享 ／ P4-2 企业级 RBAC ／ P4-3 方案版本管理 ／ P4-4 使用数据看板 ／ P4-5 Agent 自编排。
+### Phase 4 生态化（开发计划 P4-1~5）
+P4-1 模板市场社区共享 ／ P4-2 企业级 RBAC ／ P4-3 方案版本管理 ／ P4-4 使用数据看板 ／ P5 Agent 自编排。
+
+- **P4-3** ✅ 方案版本管理（2026-07-18）：
+  - 后端：`ProjectVersion` 实体 + `project_versions` 表（已补建并修正属主为 `gisagent`，规避 `ddl-auto:validate` 对已有库增量建表的顺序坑）；`ProjectVersionService` 提供快照/列表/详情/回退；`ProjectVersionController` 暴露 `/api/projects/{id}/versions`（`POST` 保存、`GET` 列表、`GET /{vid}` 详情、`POST /{vid}/restore` 回退），含 `owned()` 归属校验（跨用户 404）。
+  - 自动快照：每次流水线 `run` / 知识库重生成（`KB_RERUN`）/ 下游重跑成功后，由 `PipelineEngine` 写入版本快照（`triggerType=AUTO_RUN`/`KB_RERUN`），无需手工操作即留痕。
+  - 一键回退：将版本 `contextJson` 写回 `Project` 与最新一次 `PipelineRun`，详情页预览与下载立即反映历史版本，**不重新调用 LLM**。
+  - 前端：新增 `VersionPanel` 组件接入详情页（`.panel.full`），含「保存当前版本」（标题/备注模态）、版本卡片列表（版本号色阶徽章、触发类型、预览、备注）、「查看」（完整方案正文 + Context Bus 原始 JSON 折叠）、「恢复此版本」（二次确认模态）。回退后回调刷新预览。`projectApi` 新增 `saveVersion/listVersions/getVersion/restoreVersion`。`npm run build` 通过。
+  - **集成验证全绿**：`/tmp/p4_3_verify.py` 覆盖 手动快照 v1/v2 → 列表倒序(2条/预览取最新) → 详情含完整 contextJson → 回退 v1 → 断言 `project.context_json` 与最新 `pipeline_run.context_json` 均恢复至 V1 且不再含 V2 → 跨用户列表 404。
 
 ### 走通验证
 沙箱无外网，LLM 全链路需在真实环境（DeepSeek + IMA）跑 `p4_acceptance.py` 全绿方算"功能全做完"。
@@ -102,4 +109,4 @@ cd frontend && npm install && npm run dev   # 或 npm run build && npm run previ
 ## 已知限制
 - 沙箱无外网，流水线 `run` 会因无法调用 LLM 而 `FAILED`（前端已优雅提示）。接入真实 API Key 且有网络时即可生成方案、下载 Word/MD/PPT。
 - 流程编排页为**配置/可视化**编辑器；真正执行发生在项目详情/监控页（调用真实 `POST /projects/:id/run`）。
-- "可用 Skills / 12" 为平台能力常量（暂无独立 skills 接口）。
+- "可用 Skills" 已通过 `GET /api/skills` 由实际注册的 8 个 `PipelineTool` bean 动态驱动（F-D 已完成），Dashboard 同步动态获取，非写死常量。

@@ -539,3 +539,29 @@
 .kb-dirty-text strong { font-size: 13px; color: var(--amber); }
 .kb-dirty-text span { font-size: 12px; color: var(--muted); line-height: 1.5; }
 
+/* ===== 方案版本管理（P4-3）===== */
+.muted { color: var(--muted); font-size: 12px; }
+.link-btn { background: none; border: none; color: var(--cyan); cursor: pointer; font-size: 12px; padding: 6px 0; display: inline-block; }
+.link-btn:hover { text-decoration: underline; }
+.raw-json { margin-top: 10px; max-height: 320px; overflow: auto; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: rgba(0, 0, 0, .28); color: var(--muted); font-size: 11.5px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
+
+.version-list { display: flex; flex-direction: column; gap: 10px; }
+.version-card { display: flex; gap: 14px; align-items: flex-start; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--radius-md); background: rgba(255, 255, 255, .02); transition: border-color .2s ease, background .2s ease; }
+.version-card:hover { border-color: rgba(146, 246, 190, .35); background: rgba(146, 246, 190, .04); }
+.version-card.static { background: rgba(255, 255, 255, .015); }
+.version-no { flex: 0 0 auto; min-width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 760; font-size: 15px; color: #04140d; background: linear-gradient(135deg, var(--mint), var(--cyan)); box-shadow: 0 6px 18px rgba(94, 230, 225, .18); }
+.version-no.v1 { background: linear-gradient(135deg, #92f6be, #5ee6e1); }
+.version-no.v2 { background: linear-gradient(135deg, #8fd4ff, #5ee6e1); }
+.version-no.v3 { background: linear-gradient(135deg, #c5a7ff, #5ee6e1); }
+.version-no.v4 { background: linear-gradient(135deg, #ffd28a, #5ee6e1); }
+.version-no.v5 { background: linear-gradient(135deg, #ff9f9f, #5ee6e1); }
+.version-main { flex: 1; min-width: 0; }
+.version-title-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.version-title { font-size: 14px; font-weight: 640; color: var(--text); }
+.version-date { font-size: 11.5px; color: var(--muted-2); margin-left: auto; }
+.version-preview { margin: 6px 0 0; font-size: 12.5px; color: var(--muted); line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.version-note { margin: 6px 0 0; font-size: 12px; color: var(--muted-2); }
+.version-ops { flex: 0 0 auto; display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
+.mini-restore:hover:not(:disabled) { color: var(--amber); border-color: var(--amber); background: rgba(255, 210, 138, .08); }
+.version-detail-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+

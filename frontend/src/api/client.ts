@@ -106,6 +106,21 @@ export const projectApi = {
   // 用最新知识库重生成（清除"知识库有更新"标记并重新跑流水线）
   rerunKb: (id: number) => apiClient.post(`/projects/${id}/rerun-kb`),
 
+  // ===== 方案版本管理（P4-3）=====
+  // 手动保存当前方案为新版本（读取最新运行/项目的 contextJson）
+  saveVersion: (id: number, payload: { title?: string; note?: string }) =>
+    apiClient.post(`/projects/${id}/versions`, payload),
+
+  // 历史版本列表（轻量，含方案预览）
+  listVersions: (id: number) => apiClient.get(`/projects/${id}/versions`),
+
+  // 版本详情（含完整 contextJson）
+  getVersion: (id: number, vid: number) => apiClient.get(`/projects/${id}/versions/${vid}`),
+
+  // 一键回退到指定版本
+  restoreVersion: (id: number, vid: number) =>
+    apiClient.post(`/projects/${id}/versions/${vid}/restore`),
+
   // 下载 Markdown
   downloadMd: (id: number) =>
     apiClient.get(`/projects/${id}/download/md`, { responseType: 'blob' }),

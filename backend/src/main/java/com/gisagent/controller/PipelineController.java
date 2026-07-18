@@ -91,7 +91,7 @@ public class PipelineController {
         final PipelineRun finalRun = run;
         new Thread(() -> {
             try {
-                pipelineEngine.run(runId, projectId, templateId, llmConfig);
+                pipelineEngine.run(runId, projectId, templateId, llmConfig, "AUTO_RUN");
             } catch (Exception e) {
                 log.error("流水线执行异常", e);
                 finalRun.setStatus("FAILED");
@@ -183,7 +183,7 @@ public class PipelineController {
         final PipelineRun finalRun = run;
         new Thread(() -> {
             try {
-                pipelineEngine.rerunDownstream(runId, pid, templateId, fromOrder, llmConfig);
+                pipelineEngine.rerunDownstream(runId, pid, templateId, fromOrder, llmConfig, "AUTO_RUN");
             } catch (Exception e) {
                 log.error("下游重跑异常", e);
                 finalRun.setStatus("FAILED");
