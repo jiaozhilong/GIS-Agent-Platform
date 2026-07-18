@@ -44,10 +44,24 @@ public class Project {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    /** 知识库是否检测到更新（需基于最新知识库重生成） */
+    @Column(name = "kb_dirty", nullable = false)
+    @Builder.Default
+    private Boolean kbDirty = false;
+
+    /** 知识库更新说明（如：哪些知识库有新增/修改文档） */
+    @Column(name = "kb_dirty_note", columnDefinition = "TEXT")
+    private String kbDirtyNote;
+
+    /** 知识库标记脏的时间 */
+    @Column(name = "kb_dirty_since")
+    private Instant kbDirtySince;
+
     @PrePersist
     protected void onCreate() {
         createdAt = Instant.now();
         updatedAt = Instant.now();
+        if (kbDirty == null) kbDirty = false;
     }
 
     @PreUpdate

@@ -10,6 +10,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * IMA 知识库连接器的 Mock 实现。
@@ -19,6 +20,9 @@ import java.util.UUID;
 @Component
 @ConditionalOnProperty(name = "ima.mock-enabled", havingValue = "true", matchIfMissing = true)
 public class MockIMAKnowledgeBaseConnector implements IMAKnowledgeBaseConnector {
+
+    /** 模拟更新事件开关（仅测试/联调用，消费一次即复位） */
+    private final AtomicBoolean simulateNextUpdate = new AtomicBoolean(false);
 
     private static final Logger log = LoggerFactory.getLogger(MockIMAKnowledgeBaseConnector.class);
 
@@ -73,6 +77,16 @@ public class MockIMAKnowledgeBaseConnector implements IMAKnowledgeBaseConnector 
     @Override
     public List<KBUpdateEvent> getUpdates(String kbId, Instant since) {
         log.info("[Mock] Checking updates for kbId={} since={}", kbId, since);
+        // 测试/联调用：若已通过 armSimulation 装填，则返回一条 MODIFIED 事件（仅消费一次）
+        if (simulateNextUpdate.compareAndSet(true, false)) {
+            log.info("[Mock] 返回模拟的 MODIFIED 事件 kbId={}", kbId);
+            return List.of(new KBUpdateEvent("MODIFIED", "mock-doc-" + UUID.randomUUID().toString().substring(0, 8), Instant.now()));
+        }
         return Collections.emptyList();
+    }
+
+    /** 装填一次模拟更新事件（供 dev/test 端点触发，验证知识库自动感知链路） */
+    public void armSimulation() {
+        simulateNextUpdate.set(true);
     }
 }

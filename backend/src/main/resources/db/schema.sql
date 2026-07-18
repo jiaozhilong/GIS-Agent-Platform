@@ -171,3 +171,25 @@ CREATE TRIGGER trg_ima_kb_configs_updated BEFORE UPDATE ON ima_kb_configs
 
 CREATE TRIGGER trg_projects_updated BEFORE UPDATE ON projects
     FOR EACH ROW EXECUTE FUNCTION update_timestamp();
+
+-- ============================================================
+-- 知识库同步游标（P3-1 知识库自动感知）
+-- ============================================================
+CREATE TABLE IF NOT EXISTS kb_sync_states (
+    id           BIGSERIAL PRIMARY KEY,
+    user_id      BIGINT       NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    kb_id        VARCHAR(128) NOT NULL,
+    last_cursor  TIMESTAMP,
+    last_sync_at TIMESTAMP,
+    updated_at   TIMESTAMP    NOT NULL DEFAULT NOW(),
+    UNIQUE(user_id, kb_id)
+);
+
+-- 项目表：知识库更新感知标记（P3-1）
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS kb_dirty BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS kb_dirty_note TEXT;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS kb_dirty_since TIMESTAMP;
+
+CREATE INDEX IF NOT EXISTS idx_kb_sync_states_user ON kb_sync_states(user_id);
+CREATE INDEX IF NOT EXISTS idx_projects_kb_dirty ON projects(user_id, kb_dirty);
+

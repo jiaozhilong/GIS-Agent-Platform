@@ -111,6 +111,9 @@ public class ProjectController {
         result.put("templateId", project.getTemplateId());
         result.put("status", project.getStatus());
         result.put("createdAt", project.getCreatedAt() != null ? project.getCreatedAt().toString() : null);
+        result.put("kbDirty", Boolean.TRUE.equals(project.getKbDirty()));
+        result.put("kbDirtyNote", project.getKbDirtyNote());
+        result.put("kbDirtySince", project.getKbDirtySince() != null ? project.getKbDirtySince().toString() : null);
 
         result.put("documents", documentRepository.findByProjectId(id).stream().map(d -> {
             Map<String, Object> m = new java.util.HashMap<>();

@@ -54,6 +54,10 @@ export const imaApi = {
   updateConfig: (id: number, data: any) => apiClient.put(`/ima/configs/${id}`, data),
   deleteConfig: (id: number) => apiClient.delete(`/ima/configs/${id}`),
   testConfig: (id: number) => apiClient.post(`/ima/configs/${id}/test`),
+  // 手动触发知识库同步（P3-1）
+  kbSync: () => apiClient.post('/ima/kb-sync'),
+  // 仅 mock 模式：模拟一次知识库更新（联调验证用）
+  kbSimulate: () => apiClient.post('/ima/kb-simulate'),
 };
 
 // ===== Template (流程模板) API =====
@@ -93,6 +97,9 @@ export const projectApi = {
   // 重跑下游：从指定节点（toolOrder）之后重新执行
   rerun: (id: number, runId: number, fromOrder: number) =>
     apiClient.post(`/projects/${id}/runs/${runId}/rerun?fromOrder=${fromOrder}`),
+
+  // 用最新知识库重生成（清除"知识库有更新"标记并重新跑流水线）
+  rerunKb: (id: number) => apiClient.post(`/projects/${id}/rerun-kb`),
 
   // 下载 Markdown
   downloadMd: (id: number) =>

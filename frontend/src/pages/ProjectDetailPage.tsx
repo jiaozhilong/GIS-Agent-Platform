@@ -10,7 +10,7 @@ import {
 import { effectiveStatus, STATUS_LABEL, templateLabel, fmtDate, type EffStatus } from '../utils/status';
 
 interface ToolStatus { execId: number; toolType: string; toolOrder: number; status: string; output?: any; errorMessage?: string; }
-interface Detail { id: number; name: string; description?: string; templateId?: string; status: string; createdAt?: string; documents?: any[]; latestRun?: { id: number; status: string; tools: ToolStatus[] }; }
+interface Detail { id: number; name: string; description?: string; templateId?: string; status: string; createdAt?: string; documents?: any[]; latestRun?: { id: number; status: string; tools: ToolStatus[] }; kbDirty?: boolean; kbDirtyNote?: string; kbDirtySince?: string; }
 
 const STEP_DEFS = [
   { key: '需求输入', tool: 'REQUIREMENT_ANALYSIS', desc: '解析需求文档', color: 'mint', icon: <IconDoc /> },
@@ -162,6 +162,23 @@ export default function ProjectDetailPage() {
     await handleRerun(outline);
   };
 
+  // ===== 用最新知识库重生成（P3-1：知识库有更新时） =====
+  const [regenKb, setRegenKb] = useState(false);
+  const handleRegenKb = async () => {
+    setRegenKb(true);
+    try {
+      await projectApi.rerunKb(projectId);
+      showToast('已用最新知识库触发重生成…');
+      poll();
+      if (pollRef.current) window.clearInterval(pollRef.current);
+      pollRef.current = window.setInterval(poll, 3000);
+    } catch (e: any) {
+      showToast(e.response?.data?.error || '重生成启动失败', true);
+    } finally {
+      setRegenKb(false);
+    }
+  };
+
   if (loading && !detail) {
     return <div className="empty-state"><p>加载中…</p></div>;
   }
@@ -208,6 +225,19 @@ export default function ProjectDetailPage() {
           </button>
         </div>
       </div>
+
+      {detail?.kbDirty && (
+        <div className="kb-dirty-banner">
+          <span className="kb-dirty-icon">📡</span>
+          <div className="kb-dirty-text">
+            <strong>知识库有更新</strong>
+            <span>{detail.kbDirtyNote || '关联的知识库发生变化，建议用最新内容重生成方案。'}</span>
+          </div>
+          <button className="btn btn-primary btn-sm" onClick={handleRegenKb} disabled={regenKb || running}>
+            {regenKb ? <IconSync width={13} height={13} className="spin" /> : <IconSync width={13} height={13} />} 用最新知识库重生成
+          </button>
+        </div>
+      )}
 
       <div className="content-grid">
         {/* Workflow */}
