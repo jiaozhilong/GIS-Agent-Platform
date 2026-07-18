@@ -8,6 +8,7 @@ import com.gisagent.pipeline.PipelineTool;
 import com.gisagent.pipeline.ToolContext;
 import com.gisagent.repository.*;
 import com.gisagent.service.TeamService;
+import com.gisagent.util.EncryptionService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -39,6 +40,7 @@ public class PipelineController {
     private final ExportService exportService;
     private final ExportRepository exportRepository;
     private final TeamService teamService;
+    private final EncryptionService encryptionService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public PipelineController(ProjectRepository projectRepository,
@@ -48,7 +50,8 @@ public class PipelineController {
                               PipelineEngine pipelineEngine,
                               ExportService exportService,
                               ExportRepository exportRepository,
-                              TeamService teamService) {
+                              TeamService teamService,
+                              EncryptionService encryptionService) {
         this.projectRepository = projectRepository;
         this.pipelineRunRepository = pipelineRunRepository;
         this.toolExecutionRepository = toolExecutionRepository;
@@ -57,6 +60,7 @@ public class PipelineController {
         this.exportService = exportService;
         this.exportRepository = exportRepository;
         this.teamService = teamService;
+        this.encryptionService = encryptionService;
     }
 
     /** 启动流水线执行 */
@@ -87,7 +91,7 @@ public class PipelineController {
 
         // 异步执行（MVP 用独立线程，后续用 CompletableFuture / 消息队列）
         PipelineTool.LlmConfig llmConfig = PipelineTool.LlmConfig.of(
-                provider.getEndpoint(), provider.getApiKeyEncrypted(), defaultModel(provider));
+                provider.getEndpoint(), encryptionService.decrypt(provider.getApiKeyEncrypted()), defaultModel(provider));
         Long runId = run.getId();
         Long projectId = id;
         String templateId = project.getTemplateId();
@@ -179,7 +183,7 @@ public class PipelineController {
         }
         LlmProvider provider = providerOpt.get();
         PipelineTool.LlmConfig llmConfig = PipelineTool.LlmConfig.of(
-                provider.getEndpoint(), provider.getApiKeyEncrypted(), defaultModel(provider));
+                provider.getEndpoint(), encryptionService.decrypt(provider.getApiKeyEncrypted()), defaultModel(provider));
 
         Long pid = id;
         String templateId = project.getTemplateId();

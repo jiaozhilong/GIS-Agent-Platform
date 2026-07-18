@@ -114,6 +114,12 @@ export const statsApi = {
     apiClient.get('/stats/overview', { params: teamId ? { teamId } : {} }),
 };
 
+// ===== Agent 自编排 API（P4-5）=====
+export const orchestrateApi = {
+  // 根据自然语言需求推荐有序工具链；返回 { reason, toolChain, model, usedFallback }
+  recommend: (requirement: string) => apiClient.post('/orchestrate', { requirement }),
+};
+
 // ===== Project & Pipeline API =====
 export const projectApi = {
   // 项目列表

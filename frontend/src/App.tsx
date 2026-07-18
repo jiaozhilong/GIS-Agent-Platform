@@ -14,6 +14,7 @@ import PipelinePage from './pages/PipelinePage';
 import TemplatesPage from './pages/TemplatesPage';
 import TeamsPage from './pages/TeamsPage';
 import StatsPage from './pages/StatsPage';
+import OrchestratePage from './pages/OrchestratePage';
 import { useAuthStore } from './stores/authStore';
 
 function PrivateRoute({ children }: { children: ReactNode }) {
@@ -48,6 +49,7 @@ function App() {
             <Route path="templates" element={<TemplatesPage />} />
             <Route path="teams" element={<TeamsPage />} />
             <Route path="stats" element={<StatsPage />} />
+            <Route path="orchestrate" element={<OrchestratePage />} />
           </Route>
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>

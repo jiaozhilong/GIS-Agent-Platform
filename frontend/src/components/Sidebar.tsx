@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import {
-  IconDashboard, IconProject, IconBrain, IconBook, IconFlow, IconTemplate, IconBrand, IconUser, IconTeam, IconStats,
+  IconDashboard, IconProject, IconBrain, IconBook, IconFlow, IconTemplate, IconBrand, IconUser, IconTeam, IconStats, IconWand,
 } from './ui/icons';
 
 const navItems = [
@@ -13,6 +13,7 @@ const navItems = [
   { to: '/settings/ima', label: 'IMA 知识库', icon: IconBook, section: 'AI 配置' },
   { to: '/pipeline', label: '流程编排', icon: IconFlow, section: '方案工作流' },
   { to: '/templates', label: '模板市场', icon: IconTemplate, section: '方案工作流' },
+  { to: '/orchestrate', label: '智能编排', icon: IconWand, section: '方案工作流' },
 ];
 
 export function Sidebar() {

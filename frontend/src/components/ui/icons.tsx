@@ -41,6 +41,9 @@ export const IconTeam = (p: IconProps) => (
 export const IconStats = (p: IconProps) => (
   <svg {...base(p)}><path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/></svg>
 );
+export const IconWand = (p: IconProps) => (
+  <svg {...base(p)}><path d="M15 4V2M15 6V4M13 4h2M11 8l-1 1 4 4 1-1z"/><path d="M4 20l9-9M14 10l3 3"/><path d="M3 21l2-2"/></svg>
+);
 export const IconLock = (p: IconProps) => (
   <svg {...base(p)}><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
 );

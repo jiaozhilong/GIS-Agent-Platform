@@ -4,6 +4,7 @@ import com.gisagent.connector.IMAKnowledgeBaseConnector;
 import com.gisagent.entity.*;
 import com.gisagent.pipeline.PipelineEngine;
 import com.gisagent.pipeline.PipelineTool;
+import com.gisagent.util.EncryptionService;
 import com.gisagent.repository.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -30,6 +31,7 @@ public class KbAwarenessService {
     private final LlmProviderRepository llmProviderRepository;
     private final PipelineEngine pipelineEngine;
     private final IMAKnowledgeBaseConnector imaConnector;
+    private final EncryptionService encryptionService;
 
     public KbAwarenessService(ImaKbConfigRepository imaKbConfigRepository,
                               ProjectRepository projectRepository,
@@ -37,7 +39,8 @@ public class KbAwarenessService {
                               PipelineRunRepository pipelineRunRepository,
                               LlmProviderRepository llmProviderRepository,
                               PipelineEngine pipelineEngine,
-                              IMAKnowledgeBaseConnector imaConnector) {
+                              IMAKnowledgeBaseConnector imaConnector,
+                              EncryptionService encryptionService) {
         this.imaKbConfigRepository = imaKbConfigRepository;
         this.projectRepository = projectRepository;
         this.kbSyncStateRepository = kbSyncStateRepository;
@@ -45,6 +48,7 @@ public class KbAwarenessService {
         this.llmProviderRepository = llmProviderRepository;
         this.pipelineEngine = pipelineEngine;
         this.imaConnector = imaConnector;
+        this.encryptionService = encryptionService;
     }
 
     /** 全量同步：遍历所有配置了 IMA 知识库的用户 */
@@ -129,7 +133,7 @@ public class KbAwarenessService {
         }
         LlmProvider provider = providerOpt.get();
         PipelineTool.LlmConfig llmConfig = PipelineTool.LlmConfig.of(
-                provider.getEndpoint(), provider.getApiKeyEncrypted(), defaultModel(provider));
+                provider.getEndpoint(), encryptionService.decrypt(provider.getApiKeyEncrypted()), defaultModel(provider));
 
         PipelineRun run = PipelineRun.builder()
                 .projectId(projectId).templateId(project.getTemplateId()).status("PENDING").build();
