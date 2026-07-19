@@ -80,9 +80,11 @@ public class CompetitorTool implements PipelineTool {
                 retrieved
         );
 
-        String raw = llmService.complete(
+        com.gisagent.service.CompletionResult cr = llmService.completeWithUsage(
                 llmConfig.endpoint, llmConfig.apiKey, llmConfig.model,
                 SYSTEM_PROMPT, userPrompt, 0.3, 2048);
+        String raw = cr.content();
+        context.addUsage(cr.usage());
 
         try {
             JsonNode node = objectMapper.readTree(extractJson(raw));

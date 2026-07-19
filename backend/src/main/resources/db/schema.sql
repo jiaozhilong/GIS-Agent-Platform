@@ -119,6 +119,9 @@ CREATE TABLE IF NOT EXISTS pipeline_runs (
     status          VARCHAR(32)  NOT NULL DEFAULT 'PENDING', -- PENDING | RUNNING | SUCCESS | FAILED | PARTIAL
     context_json    JSONB,                            -- 执行时的上下文快照
     error_message   TEXT,
+    input_tokens    BIGINT,                            -- P7-3 计费：输入 token
+    output_tokens   BIGINT,                            -- P7-3 计费：输出 token
+    total_tokens    BIGINT,                            -- P7-3 计费：合计 token
     started_at      TIMESTAMP,
     finished_at     TIMESTAMP,
     created_at      TIMESTAMP    NOT NULL DEFAULT NOW()

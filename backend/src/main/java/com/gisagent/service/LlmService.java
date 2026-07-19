@@ -22,6 +22,10 @@ import java.util.Map;
  * LLM 调用服务。封装 OpenAI 兼容协议，支持不同 Provider / 模型 /
  * Temperature / MaxTokens 配置。
  */
+/**
+ * 一次补全的返回：文本内容 + token 用量（P7-3 计费需要）。
+ * 见独立文件 CompletionResult.java（public 顶层 record 须与文件名一致）。
+ */
 @Service
 @Slf4j
 public class LlmService {
@@ -54,6 +58,19 @@ public class LlmService {
     public String complete(String endpoint, String apiKey, String model,
                             String systemPrompt, String userPrompt,
                             Double temperature, Integer maxTokens) {
+        return completeWithUsage(endpoint, apiKey, model, systemPrompt, userPrompt, temperature, maxTokens).content();
+    }
+
+    /**
+     * 调用 LLM 进行单次补全，并返回 token 用量（P7-3 计费）。
+     * 解析 OpenAI / DeepSeek 兼容响应的 usage 字段：
+     * {"usage": {"prompt_tokens": N, "completion_tokens": N, "total_tokens": N}}
+     *
+     * @return 补全文本 + 用量（解析失败或缺失时 usage 为 ZERO，不影响主流程）
+     */
+    public CompletionResult completeWithUsage(String endpoint, String apiKey, String model,
+                                              String systemPrompt, String userPrompt,
+                                              Double temperature, Integer maxTokens) {
         String url = ensureChatCompletionsUrl(endpoint);
 
         HttpHeaders headers = new HttpHeaders();
@@ -78,10 +95,32 @@ public class LlmService {
 
         try {
             ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
-            return extractContent(response.getBody());
+            String respBody = response.getBody();
+            return new CompletionResult(extractContent(respBody), extractUsage(respBody));
         } catch (Exception e) {
             log.error("LLM 调用失败: endpoint={}, model={}", endpoint, model, e);
             throw new RuntimeException("LLM 调用失败: " + e.getMessage(), e);
+        }
+    }
+
+    /** 从响应体解析 usage（缺失/异常时返回 ZERO） */
+    private LlmUsage extractUsage(String responseBody) {
+        if (responseBody == null || responseBody.isBlank()) {
+            return LlmUsage.ZERO;
+        }
+        try {
+            JsonNode root = objectMapper.readTree(responseBody);
+            JsonNode usage = root.path("usage");
+            if (usage.isMissingNode() || usage.isNull()) {
+                return LlmUsage.ZERO;
+            }
+            return new LlmUsage(
+                    usage.path("prompt_tokens").asLong(0),
+                    usage.path("completion_tokens").asLong(0),
+                    usage.path("total_tokens").asLong(0));
+        } catch (Exception e) {
+            log.warn("解析 LLM usage 失败，按 0 计", e);
+            return LlmUsage.ZERO;
         }
     }
 

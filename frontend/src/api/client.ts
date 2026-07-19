@@ -140,6 +140,14 @@ export const statsApi = {
     apiClient.get('/stats/overview', { params: teamId ? { teamId } : {} }),
 };
 
+// ===== 用量计费 API（P7-3）=====
+export const usageApi = {
+  // 用量聚合：self 默认本人范围；all=true 限超管查看全平台；orgId/projectId 限定范围
+  // from / to 为 YYYY-MM-DD（UTC 窗口过滤），可选
+  summary: (params: { all?: boolean; orgId?: number; projectId?: number; from?: string; to?: string }) =>
+    apiClient.get('/usage/summary', { params: { ...params } }),
+};
+
 // ===== Agent 自编排 API（P4-5）=====
 export const orchestrateApi = {
   // 根据自然语言需求推荐有序工具链；返回 { reason, toolChain, model, usedFallback }

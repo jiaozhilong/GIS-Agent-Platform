@@ -49,9 +49,11 @@ public class RequirementAnalysisTool implements PipelineTool {
         String userPrompt = "请分析以下客户需求文档，提取结构化需求：\n\n"
                 + context.getRequirementDoc();
 
-        String raw = llmService.complete(
+        com.gisagent.service.CompletionResult r = llmService.completeWithUsage(
                 llmConfig.endpoint, llmConfig.apiKey, llmConfig.model,
                 SYSTEM_PROMPT, userPrompt, llmConfig.temperature, llmConfig.maxTokens);
+        String raw = r.content();
+        context.addUsage(r.usage());
 
         try {
             JsonNode node = objectMapper.readTree(extractJson(raw));

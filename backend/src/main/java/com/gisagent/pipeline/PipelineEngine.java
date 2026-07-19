@@ -8,6 +8,7 @@ import com.gisagent.entity.ProjectVersion;
 import com.gisagent.export.ExportService;
 import com.gisagent.repository.*;
 import com.gisagent.service.LlmService;
+import com.gisagent.service.LlmUsage;
 import com.gisagent.service.EmbeddingService;
 import com.gisagent.util.FileTextExtractor;
 import lombok.extern.slf4j.Slf4j;
@@ -279,6 +280,11 @@ public class PipelineEngine {
         if (!"FAILED".equals(run.getStatus())) {
             run.setStatus(anyFailed ? "PARTIAL" : "SUCCESS");
         }
+        // P7-3：落库本次运行累计 token 用量
+        LlmUsage u = context.getUsage();
+        run.setInputTokens(u.getPromptTokens());
+        run.setOutputTokens(u.getCompletionTokens());
+        run.setTotalTokens(u.getTotalTokens());
         run.setFinishedAt(Instant.now());
         run.setContextJson(toJson(context.toMap()));
         pipelineRunRepository.save(run);
@@ -398,6 +404,11 @@ public class PipelineEngine {
         }
 
         run.setContextJson(toJson(ctx.toMap()));
+        // P7-3：重跑下游额外消耗 token，累加到既有运行用量（而非覆盖）
+        LlmUsage rerunUsage = ctx.getUsage();
+        run.setInputTokens(zeroIfNull(run.getInputTokens()) + rerunUsage.getPromptTokens());
+        run.setOutputTokens(zeroIfNull(run.getOutputTokens()) + rerunUsage.getCompletionTokens());
+        run.setTotalTokens(zeroIfNull(run.getTotalTokens()) + rerunUsage.getTotalTokens());
         run.setFinishedAt(Instant.now());
         run.setStatus(anyFailed ? "PARTIAL" : "SUCCESS");
         pipelineRunRepository.save(run);
@@ -450,6 +461,11 @@ public class PipelineEngine {
                 .toolOrder(order)
                 .status("PENDING")
                 .build();
+    }
+
+    /** token 字段可能为 null（历史数据），聚合时按 0 处理 */
+    private long zeroIfNull(Long v) {
+        return v == null ? 0L : v;
     }
 
     private Object safeOutput(ToolContext context, String toolType) {

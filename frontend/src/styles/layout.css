@@ -226,3 +226,59 @@
   .stats-row { grid-template-columns: 1fr 1fr; gap: 10px; }
   .quick-actions { grid-template-columns: 1fr; }
 }
+
+/* ===== 用量计费页（P7-3）===== */
+/* 5 列概览卡片（默认 4 列，用量页超管视图下需 5 张） */
+.usage-grid .stats-row { grid-template-columns: repeat(5, 1fr); }
+@media (max-width: 1280px) { .usage-grid .stats-row { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 860px) { .usage-grid .stats-row { grid-template-columns: 1fr 1fr; } }
+/* 维度表格双列均分 */
+.usage-grid .content-grid { grid-template-columns: 1fr 1fr; }
+.usage-grid .filter-bar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+}
+.usage-grid .date-field {
+  display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted);
+}
+.usage-grid .date-field input {
+  min-height: 38px; padding: 0 12px; border: 1px solid var(--line);
+  border-radius: var(--radius-sm); color: var(--text); background: rgba(255, 255, 255, .03);
+  font-size: 13px; outline: none; transition: .2s ease;
+}
+.usage-grid .date-field input:focus { border-color: var(--mint); }
+.usage-grid .switch-field {
+  display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); cursor: pointer;
+  padding: 0 10px; min-height: 38px; border: 1px solid var(--line); border-radius: var(--radius-sm);
+}
+.usage-grid .switch-field input { accent-color: var(--mint); }
+.btn-primary {
+  min-height: 38px; padding: 0 18px; border: none; border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, var(--mint), var(--cyan)); color: #06231c;
+  font-size: 13px; font-weight: 700; cursor: pointer; transition: .2s ease;
+}
+.btn-primary:hover { filter: brightness(1.08); }
+.btn-primary:disabled { opacity: .6; cursor: default; }
+.usage-scope-tag {
+  font-size: 13px; color: var(--muted); margin: -18px 0 18px; padding: 8px 14px;
+  border: 1px solid var(--line); border-radius: var(--radius-sm); background: rgba(255, 255, 255, .02);
+  display: inline-block;
+}
+.usage-scope-tag b { color: var(--mint); }
+/* 维度聚合表格 */
+.dim-table { display: flex; flex-direction: column; }
+.dim-row {
+  display: grid; grid-template-columns: 1.8fr 1fr 1fr; align-items: center;
+  padding: 12px 24px; border-bottom: 1px solid var(--line); font-size: 13px;
+}
+.dim-row:last-child { border-bottom: none; }
+.dim-row:hover:not(.dim-head) { background: rgba(255, 255, 255, .02); }
+.dim-head {
+  font-size: 11px; font-weight: 760; color: var(--muted-2);
+  letter-spacing: .06em; text-transform: uppercase; background: rgba(255, 255, 255, .015);
+}
+.dim-row span:nth-child(n+2) { color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; }
+.dim-row span:first-child { color: var(--text); font-weight: 600; }
+@media (max-width: 600px) {
+  .usage-grid .content-grid { grid-template-columns: 1fr; }
+  .dim-row { grid-template-columns: 1.4fr 1fr 1fr; }
+}

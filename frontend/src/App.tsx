@@ -14,6 +14,7 @@ import PipelinePage from './pages/PipelinePage';
 import TemplatesPage from './pages/TemplatesPage';
 import TeamsPage from './pages/TeamsPage';
 import StatsPage from './pages/StatsPage';
+import UsagePage from './pages/UsagePage';
 import OrchestratePage from './pages/OrchestratePage';
 import UsersAdminPage from './pages/UsersAdminPage';
 import UserProfilePage from './pages/UserProfilePage';
@@ -52,6 +53,7 @@ function App() {
             <Route path="templates" element={<TemplatesPage />} />
             <Route path="teams" element={<TeamsPage />} />
             <Route path="stats" element={<StatsPage />} />
+            <Route path="usage" element={<UsagePage />} />
             <Route path="orchestrate" element={<OrchestratePage />} />
             <Route path="profile" element={<UserProfilePage />} />
             <Route path="admin/users" element={<UsersAdminPage />} />

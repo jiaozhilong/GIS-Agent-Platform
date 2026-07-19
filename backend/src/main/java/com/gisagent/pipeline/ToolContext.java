@@ -1,6 +1,8 @@
 package com.gisagent.pipeline;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.gisagent.service.LlmUsage;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -46,6 +48,10 @@ public class ToolContext {
 
     /** 最终方案文本（Tool-8 写入） */
     private String solutionText;
+
+    /** 本次运行累计 LLM token 用量（P7-3 计费）；不序列化进 contextJson */
+    @JsonIgnore
+    private LlmUsage usage = LlmUsage.ZERO;
 
     @Data
     @NoArgsConstructor
@@ -179,5 +185,16 @@ public class ToolContext {
         map.put("qualityCheck", qualityCheck);
         map.put("solutionText", solutionText);
         return map;
+    }
+
+    /** 累计一次 LLM 调用的 token 用量（并行工具共享同一 context，需线程安全） */
+    public synchronized void addUsage(LlmUsage u) {
+        if (u == null) return;
+        this.usage = this.usage.add(u);
+    }
+
+    /** 当前累计用量，永不为 null */
+    public LlmUsage getUsage() {
+        return this.usage;
     }
 }

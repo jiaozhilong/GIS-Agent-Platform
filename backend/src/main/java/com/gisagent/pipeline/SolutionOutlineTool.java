@@ -72,9 +72,11 @@ public class SolutionOutlineTool implements PipelineTool {
                 suggestions
         );
 
-        String raw = llmService.complete(
+        com.gisagent.service.CompletionResult r = llmService.completeWithUsage(
                 llmConfig.endpoint, llmConfig.apiKey, llmConfig.model,
                 SYSTEM_PROMPT, userPrompt, 0.4, 2048);
+        String raw = r.content();
+        context.addUsage(r.usage());
 
         try {
             JsonNode node = objectMapper.readTree(extractJson(raw));

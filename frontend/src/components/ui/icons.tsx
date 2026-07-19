@@ -95,3 +95,7 @@ export const IconChevronRight = (p: IconProps) => (
 export const IconBrand = (p: IconProps) => (
   <svg {...base(p)}><path d="M4 17.5 12 21l8-3.5M4 12l8 3.5 8-3.5M12 3 4 6.5l8 3.5 8-3.5L12 3Z"/></svg>
 );
+// 用量计费：计量表（仪表盘指针 + 刻度）
+export const IconUsage = (p: IconProps) => (
+  <svg {...base(p)}><path d="M12 13l4-4"/><circle cx="12" cy="13" r="8"/><path d="M12 13h.01"/><path d="M4.9 19.1 3 21M19.1 19.1 21 21"/></svg>
+);

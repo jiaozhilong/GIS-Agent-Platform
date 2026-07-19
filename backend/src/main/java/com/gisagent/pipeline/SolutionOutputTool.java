@@ -77,9 +77,11 @@ public class SolutionOutputTool implements PipelineTool {
                 context.getQualityCheck() != null ? context.getQualityCheck().getSuggestions() : "（无）"
         );
 
-        String raw = llmService.complete(
+        com.gisagent.service.CompletionResult r = llmService.completeWithUsage(
                 llmConfig.endpoint, llmConfig.apiKey, llmConfig.model,
                 SYSTEM_PROMPT, userPrompt, 0.5, 4096);
+        String raw = r.content();
+        context.addUsage(r.usage());
 
         if (raw == null || raw.isBlank()) {
             log.warn("方案输出为空");

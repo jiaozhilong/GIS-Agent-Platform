@@ -35,6 +35,16 @@ public class PipelineRun {
     @Column(name = "error_message", columnDefinition = "TEXT")
     private String errorMessage;
 
+    /** LLM token 用量（P7-3 计费）：输入/输出/合计 */
+    @Column(name = "input_tokens")
+    private Long inputTokens;
+
+    @Column(name = "output_tokens")
+    private Long outputTokens;
+
+    @Column(name = "total_tokens")
+    private Long totalTokens;
+
     @Column(name = "started_at")
     private Instant startedAt;
 
