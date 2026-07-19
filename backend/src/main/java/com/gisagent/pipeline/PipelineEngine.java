@@ -15,6 +15,8 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.*;
+import java.util.stream.Collectors;
 
 /**
  * 流水线引擎（Phase 2 扩展版）。
@@ -48,6 +50,25 @@ public class PipelineEngine {
 
     /** 回退工具链（DB 模板缺失时） */
     private static final Map<String, List<PipelineTool>> FALLBACK_TOOLS = new LinkedHashMap<>();
+
+    /** 工具依赖 DAG：key 依赖的所有 toolType 必须完成（空 = 无依赖） */
+    private static final Map<String, Set<String>> TOOL_DEPS = Map.of(
+        "REQUIREMENT_ANALYSIS", Set.of(),
+        "PRODUCT_MATCHING",     Set.of("REQUIREMENT_ANALYSIS"),
+        "CASE_RECOMMEND",       Set.of("PRODUCT_MATCHING"),
+        "COMPETITOR_ANALYSIS",  Set.of("PRODUCT_MATCHING"),
+        "ARCHITECTURE_DIAGRAM", Set.of("REQUIREMENT_ANALYSIS"),
+        "SOLUTION_OUTLINE",     Set.of("REQUIREMENT_ANALYSIS", "PRODUCT_MATCHING"),
+        "SOLUTION_QC",          Set.of("SOLUTION_OUTLINE"),
+        "SOLUTION_OUTPUT",      Set.of("SOLUTION_QC")
+    );
+
+    /** 单工具超时（秒），默认 120s */
+    private static final int TOOL_TIMEOUT_SECONDS = 120;
+    /** 失败重试次数 */
+    private static final int MAX_RETRIES = 1;
+
+    private final ExecutorService executor = Executors.newFixedThreadPool(4);
 
     public PipelineEngine(RequirementAnalysisTool requirementAnalysisTool,
                           ProductMatchingTool productMatchingTool,
@@ -99,12 +120,9 @@ public class PipelineEngine {
     }
 
     /**
-     * 同步执行流水线（MVP 简化版，无画布拖拽）。
-     *
-     * @param pipelineRunId 流水线运行记录 ID
-     * @param projectId     项目 ID
-     * @param templateId    模板 key
-     * @param llmConfig     LLM 配置
+     * DAG 并行执行流水线（P5-3）。
+     * 根据工具依赖 DAG 拓扑排序，将无依赖的工具分组并行执行，
+     * 每个工具带超时控制（120s）和失败重试（1 次）。
      */
     public void run(Long pipelineRunId, Long projectId, String templateId, PipelineTool.LlmConfig llmConfig,
                     String triggerType) {
@@ -117,51 +135,77 @@ public class PipelineEngine {
 
         List<PipelineTool> tools = resolveTools(templateId);
 
-        // 初始化 Context Bus
         ToolContext context = ToolContext.empty();
         context.setRequirementDoc(loadRequirementDoc(projectId));
 
-        boolean anyFailed = false;
+        // 构建 toolType → 执行记录 映射
+        Map<String, ToolExecution> execMap = new LinkedHashMap<>();
         int order = 0;
         for (PipelineTool tool : tools) {
             ToolExecution exec = createToolExecution(run.getId(), tool.getToolType(), order++);
-            exec.setStatus("RUNNING");
-            exec.setStartedAt(Instant.now());
             exec.setLlmModel(llmConfig.model);
-            toolExecutionRepository.save(exec);
+            execMap.put(tool.getToolType(), exec);
+        }
 
-            boolean success;
-            try {
-                success = tool.execute(context, llmConfig);
-            } catch (Exception e) {
-                log.error("工具执行异常: {}", tool.getToolType(), e);
-                success = false;
+        // DAG 分组并行执行
+        Set<String> completed = ConcurrentHashMap.newKeySet();
+        boolean anyFailed = false;
+        List<PipelineTool> remaining = new ArrayList<>(tools);
+
+        while (!remaining.isEmpty()) {
+            // 找出所有依赖已满足的工具
+            List<PipelineTool> ready = remaining.stream()
+                    .filter(t -> TOOL_DEPS.getOrDefault(t.getToolType(), Set.of()).stream()
+                            .allMatch(completed::contains))
+                    .collect(Collectors.toList());
+            if (ready.isEmpty()) {
+                log.error("DAG 死锁：无法继续执行，已完成={}, 剩余={}", completed,
+                        remaining.stream().map(PipelineTool::getToolType).toList());
+                break;
             }
 
-            exec.setFinishedAt(Instant.now());
-            exec.setStatus(success ? "SUCCESS" : "FAILED");
-            exec.setOutputJson(toJson(safeOutput(context, tool.getToolType())));
-            toolExecutionRepository.save(exec);
+            // 并行执行当前分组
+            List<Future<Boolean>> futures = new ArrayList<>();
+            for (PipelineTool tool : ready) {
+                futures.add(executor.submit(() -> executeWithRetry(tool, context, llmConfig, execMap.get(tool.getToolType()))));
+            }
 
-            if (!success) {
-                anyFailed = true;
-                // MVP 策略：Tool-1 失败则整体失败；其余失败则 PARTIAL
-                if ("REQUIREMENT_ANALYSIS".equals(tool.getToolType())) {
-                    run.setStatus("FAILED");
-                    run.setErrorMessage("需求分析失败");
-                    break;
+            for (int i = 0; i < ready.size(); i++) {
+                PipelineTool tool = ready.get(i);
+                try {
+                    boolean success = futures.get(i).get(TOOL_TIMEOUT_SECONDS + 10, TimeUnit.SECONDS);
+                    completed.add(tool.getToolType());
+                    if (!success) {
+                        anyFailed = true;
+                        if ("REQUIREMENT_ANALYSIS".equals(tool.getToolType())) {
+                            run.setStatus("FAILED");
+                            run.setErrorMessage("需求分析失败");
+                            // 保存已完成的执行记录
+                            saveAll(execMap);
+                            finishRun(run, context, anyFailed);
+                            return;
+                        }
+                    }
+                } catch (TimeoutException e) {
+                    log.error("工具执行超时: {}", tool.getToolType());
+                    completed.add(tool.getToolType()); // 标记完成避免死锁
+                    anyFailed = true;
+                    markFailed(execMap.get(tool.getToolType()), "执行超时 (" + TOOL_TIMEOUT_SECONDS + "s)");
+                } catch (Exception e) {
+                    log.error("工具执行异常: {}", tool.getToolType(), e);
+                    completed.add(tool.getToolType());
+                    anyFailed = true;
+                    markFailed(execMap.get(tool.getToolType()), e.getMessage());
                 }
             }
+
+            remaining.removeAll(ready);
         }
 
-        if (!"FAILED".equals(run.getStatus())) {
-            run.setStatus(anyFailed ? "PARTIAL" : "SUCCESS");
-        }
-        run.setFinishedAt(Instant.now());
-        run.setContextJson(toJson(context.toMap()));
-        pipelineRunRepository.save(run);
+        saveAll(execMap);
+        finishRun(run, context, anyFailed);
 
-        // 版本快照：仅在生成成功/部分成功时留档（失败不快照）
+        // 版本快照 + 向量索引
         if (!"FAILED".equals(run.getStatus())) {
             try {
                 ProjectVersion v = versionService.snapshot(projectId, run.getContextJson(), triggerType, null, null);
@@ -169,8 +213,6 @@ public class PipelineEngine {
             } catch (Exception e) {
                 log.warn("版本快照保存失败（不影响主流程）: {}", e.getMessage());
             }
-
-            // 向量化索引：将生成的方案正文写入 kb_documents 供后续语义检索
             try {
                 String generatedContent = buildIndexableContent(context);
                 if (generatedContent != null && !generatedContent.isBlank()) {
@@ -183,6 +225,63 @@ public class PipelineEngine {
         }
 
         log.info("流水线执行完成: runId={}, status={}", pipelineRunId, run.getStatus());
+    }
+
+    /** 带重试的单工具执行 */
+    private boolean executeWithRetry(PipelineTool tool, ToolContext ctx,
+                                      PipelineTool.LlmConfig llmConfig, ToolExecution exec) {
+        exec.setStatus("RUNNING");
+        exec.setStartedAt(Instant.now());
+        toolExecutionRepository.save(exec);
+
+        for (int attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+            try {
+                if (attempt > 0) {
+                    log.info("重试工具 {} (attempt {}/{})", tool.getToolType(), attempt, MAX_RETRIES);
+                }
+                boolean success = tool.execute(ctx, llmConfig);
+                exec.setFinishedAt(Instant.now());
+                exec.setStatus(success ? "SUCCESS" : "FAILED");
+                exec.setOutputJson(toJson(safeOutput(ctx, tool.getToolType())));
+                toolExecutionRepository.save(exec);
+                return success;
+            } catch (Exception e) {
+                log.warn("工具 {} 执行异常 (attempt {}): {}", tool.getToolType(), attempt, e.getMessage());
+                if (attempt >= MAX_RETRIES) {
+                    exec.setFinishedAt(Instant.now());
+                    exec.setStatus("FAILED");
+                    exec.setOutputJson("{\"error\":\"" + e.getMessage() + "\"}");
+                    toolExecutionRepository.save(exec);
+                    return false;
+                }
+            }
+        }
+        return false;
+    }
+
+    private void markFailed(ToolExecution exec, String msg) {
+        exec.setFinishedAt(Instant.now());
+        exec.setStatus("FAILED");
+        exec.setOutputJson("{\"error\":\"" + (msg != null ? msg.replace("\"", "'") : "未知错误") + "\"}");
+        toolExecutionRepository.save(exec);
+    }
+
+    private void saveAll(Map<String, ToolExecution> execMap) {
+        for (ToolExecution exec : execMap.values()) {
+            if (exec.getStatus().equals("PENDING")) {
+                exec.setStatus("SKIPPED");
+                toolExecutionRepository.save(exec);
+            }
+        }
+    }
+
+    private void finishRun(PipelineRun run, ToolContext context, boolean anyFailed) {
+        if (!"FAILED".equals(run.getStatus())) {
+            run.setStatus(anyFailed ? "PARTIAL" : "SUCCESS");
+        }
+        run.setFinishedAt(Instant.now());
+        run.setContextJson(toJson(context.toMap()));
+        pipelineRunRepository.save(run);
     }
 
     /**
