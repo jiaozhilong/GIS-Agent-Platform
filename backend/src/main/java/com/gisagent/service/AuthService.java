@@ -9,6 +9,8 @@ import com.gisagent.repository.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.UUID;
+
 @Service
 public class AuthService {
 
@@ -70,6 +72,27 @@ public class AuthService {
             throw new IllegalArgumentException("用户名或密码错误");
         }
 
+        Long orgId = user.getOrganizationId() != null ? user.getOrganizationId() : defaultOrganizationId();
+        String token = jwtTokenProvider.generateToken(user.getId(), user.getUsername(), user.getRole(), orgId);
+        return new AuthDto.AuthResponse(token, user.getUsername(), user.getId(), user.getRole(), orgId);
+    }
+
+    /** SSO 登录：按 email 关联已有用户，不存在则新建（随机密码，仅 SSO 可登录）。 */
+    public AuthDto.AuthResponse ssoLogin(String email, String name) {
+        User user = userRepository.findByEmail(email).orElse(null);
+        if (user == null) {
+            Long orgId = defaultOrganizationId();
+            user = User.builder()
+                    .username(email)
+                    .password(passwordEncoder.encode(UUID.randomUUID().toString()))
+                    .role("USER")
+                    .enabled(true)
+                    .email(email)
+                    .displayName(name)
+                    .organizationId(orgId)
+                    .build();
+            user = userRepository.save(user);
+        }
         Long orgId = user.getOrganizationId() != null ? user.getOrganizationId() : defaultOrganizationId();
         String token = jwtTokenProvider.generateToken(user.getId(), user.getUsername(), user.getRole(), orgId);
         return new AuthDto.AuthResponse(token, user.getUsername(), user.getId(), user.getRole(), orgId);
