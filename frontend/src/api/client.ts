@@ -182,6 +182,12 @@ export const toolApi = {
     apiClient.put(`/projects/${projectId}/tools/${execId}`, { output }),
 };
 
+// ===== Search API（P5-1 向量混合检索）=====
+export const searchApi = {
+  search: (projectId: number, query: string, topK = 5) =>
+    apiClient.post('/search', { projectId, query, topK }),
+};
+
 // 触发浏览器下载 blob
 export function downloadBlob(blob: Blob, fileName: string) {
   const url = window.URL.createObjectURL(blob);

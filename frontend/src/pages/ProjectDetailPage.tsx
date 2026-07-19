@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { projectApi, toolApi, downloadBlob } from '../api/client';
+import { projectApi, toolApi, downloadBlob, searchApi } from '../api/client';
 import { useToast } from '../components/ui/Toast';
 import { Modal } from '../components/ui/Modal';
 import VersionPanel from '../components/VersionPanel';
@@ -54,6 +54,11 @@ export default function ProjectDetailPage() {
   const [savingEdit, setSavingEdit] = useState(false);
   const [rerunning, setRerunning] = useState<number | null>(null);
 
+  // P5-1 语义搜索
+  const [searchQ, setSearchQ] = useState('');
+  const [searching, setSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<any[] | null>(null);
+
   const loadOnce = async () => {
     try {
       const { data: d } = await projectApi.getById(projectId);
@@ -103,6 +108,25 @@ export default function ProjectDetailPage() {
     } catch (e: any) {
       setRunning(false);
       showToast(e.response?.data?.error || '启动失败，请确认已配置 LLM Provider', true);
+    }
+  };
+
+  // P5-1 语义搜索
+  const handleSearch = async () => {
+    const q = searchQ.trim();
+    if (!q) return;
+    setSearching(true);
+    setSearchResults(null);
+    try {
+      const { data } = await searchApi.search(projectId, q, 5);
+      setSearchResults(data.results || []);
+      if (!data.results || data.results.length === 0) {
+        showToast('未找到相关内容');
+      }
+    } catch (e: any) {
+      showToast(e.response?.data?.error || '搜索失败', true);
+    } finally {
+      setSearching(false);
     }
   };
 
@@ -237,6 +261,32 @@ export default function ProjectDetailPage() {
           <button className="btn btn-primary btn-sm" onClick={handleRegenKb} disabled={regenKb || running}>
             {regenKb ? <IconSync width={13} height={13} className="spin" /> : <IconSync width={13} height={13} />} 用最新知识库重生成
           </button>
+        </div>
+      )}
+
+      {/* P5-1 语义搜索 */}
+      <div className="search-bar">
+        <input
+          className="search-input"
+          placeholder="搜索项目方案内容…（支持语义检索）"
+          value={searchQ}
+          onChange={(e) => setSearchQ(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+        />
+        <button className="btn btn-primary btn-sm" onClick={handleSearch} disabled={searching}>
+          {searching ? '搜索中…' : '搜索'}
+        </button>
+      </div>
+      {searchResults && searchResults.length > 0 && (
+        <div className="search-results">
+          {searchResults.map((r: any, i: number) => (
+            <div key={i} className="search-result-item">
+              <div className="search-result-meta">
+                <span className="search-result-source">{r.source}</span>
+              </div>
+              <div className="search-result-content">{r.content}</div>
+            </div>
+          ))}
         </div>
       )}
 

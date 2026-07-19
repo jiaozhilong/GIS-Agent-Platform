@@ -8,6 +8,7 @@ import com.gisagent.entity.ProjectVersion;
 import com.gisagent.export.ExportService;
 import com.gisagent.repository.*;
 import com.gisagent.service.LlmService;
+import com.gisagent.service.EmbeddingService;
 import com.gisagent.util.FileTextExtractor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -39,6 +40,7 @@ public class PipelineEngine {
     private final ExportService exportService;
     private final PipelineTemplateRepository templateRepository;
     private final com.gisagent.service.ProjectVersionService versionService;
+    private final EmbeddingService embeddingService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /** toolType → 实际工具实例，用于按模板工具链解析 */
@@ -60,7 +62,8 @@ public class PipelineEngine {
                           ProjectDocumentRepository projectDocumentRepository,
                           ExportService exportService,
                           PipelineTemplateRepository templateRepository,
-                          com.gisagent.service.ProjectVersionService versionService) {
+                          com.gisagent.service.ProjectVersionService versionService,
+                          EmbeddingService embeddingService) {
         this.requirementAnalysisTool = requirementAnalysisTool;
         this.productMatchingTool = productMatchingTool;
         this.caseRecommendTool = caseRecommendTool;
@@ -75,6 +78,7 @@ public class PipelineEngine {
         this.exportService = exportService;
         this.templateRepository = templateRepository;
         this.versionService = versionService;
+        this.embeddingService = embeddingService;
 
         TOOL_BY_TYPE.put("REQUIREMENT_ANALYSIS", requirementAnalysisTool);
         TOOL_BY_TYPE.put("PRODUCT_MATCHING", productMatchingTool);
@@ -164,6 +168,17 @@ public class PipelineEngine {
                 if (v != null) log.info("已自动保存版本快照 v{} (trigger={})", v.getVersionNo(), triggerType);
             } catch (Exception e) {
                 log.warn("版本快照保存失败（不影响主流程）: {}", e.getMessage());
+            }
+
+            // 向量化索引：将生成的方案正文写入 kb_documents 供后续语义检索
+            try {
+                String generatedContent = buildIndexableContent(context);
+                if (generatedContent != null && !generatedContent.isBlank()) {
+                    embeddingService.clearProject(projectId);
+                    embeddingService.indexText(projectId, "GENERATED", generatedContent, null);
+                }
+            } catch (Exception e) {
+                log.warn("向量化索引失败（不影响主流程）: {}", e.getMessage());
             }
         }
 
@@ -296,6 +311,17 @@ public class PipelineEngine {
             } catch (Exception e) {
                 log.warn("版本快照保存失败（不影响主流程）: {}", e.getMessage());
             }
+
+            // 向量化索引更新
+            try {
+                String content = buildIndexableContent(ctx);
+                if (content != null && !content.isBlank()) {
+                    embeddingService.clearProject(projectId);
+                    embeddingService.indexText(projectId, "GENERATED", content, null);
+                }
+            } catch (Exception e) {
+                log.warn("向量化索引更新失败（不影响主流程）: {}", e.getMessage());
+            }
         }
 
         log.info("下游重跑完成: runId={}, fromOrder={}, 下游节点数={}, status={}",
@@ -345,6 +371,30 @@ public class PipelineEngine {
         } catch (Exception e) {
             return ToolContext.empty();
         }
+    }
+
+    /** 提取流水线产物中可索引的文本，用于向量化入库 */
+    private String buildIndexableContent(ToolContext ctx) {
+        StringBuilder sb = new StringBuilder();
+        if (ctx.getSolutionText() != null) {
+            sb.append(ctx.getSolutionText()).append("\n");
+        }
+        if (ctx.getSolutionOutline() != null) {
+            ToolContext.SolutionOutline outline = ctx.getSolutionOutline();
+            if (outline.getOverview() != null) sb.append(outline.getOverview()).append("\n");
+            if (outline.getSections() != null) {
+                for (ToolContext.OutlineSection sec : outline.getSections()) {
+                    if (sec.getTitle() != null) sb.append(sec.getTitle()).append(": ");
+                    if (sec.getKeyPoints() != null) sb.append(sec.getKeyPoints()).append("\n");
+                }
+            }
+        }
+        if (ctx.getRequirements() != null) {
+            ToolContext.RequirementResult req = ctx.getRequirements();
+            if (req.getFunctional() != null) sb.append(String.join("; ", req.getFunctional())).append("\n");
+            if (req.getIndustry() != null) sb.append(req.getIndustry()).append("\n");
+        }
+        return sb.toString().trim();
     }
 
     /**

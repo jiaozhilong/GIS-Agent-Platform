@@ -136,6 +136,77 @@ public class LlmService {
         return base + "/chat/completions";
     }
 
+    /**
+     * 调用 embedding 模型，返回浮点数向量（1536 维）。
+     * 兼容 OpenAI / DeepSeek embedding API（/v1/embeddings）。
+     *
+     * @param endpoint API 地址
+     * @param apiKey   API Key
+     * @param text     待向量化的文本
+     * @return float[] 向量，失败时返回 null
+     */
+    public float[] embedding(String endpoint, String apiKey, String text) {
+        String url = ensureEmbeddingsUrl(endpoint);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        if (apiKey != null && !apiKey.isBlank()) {
+            headers.setBearerAuth(apiKey);
+        }
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("model", "text-embedding-ada-002"); // OpenAI compatible
+        body.put("input", text);
+
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+
+        try {
+            ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
+            return extractEmbedding(response.getBody());
+        } catch (Exception e) {
+            log.error("Embedding 调用失败: endpoint={}", endpoint, e);
+            return null;
+        }
+    }
+
+    private String ensureEmbeddingsUrl(String endpoint) {
+        if (endpoint == null || endpoint.isBlank()) {
+            throw new IllegalArgumentException("LLM endpoint 不能为空");
+        }
+        String base = endpoint.trim();
+        if (base.endsWith("/")) {
+            base = base.substring(0, base.length() - 1);
+        }
+        if (base.endsWith("/embeddings")) {
+            return base;
+        }
+        return base + "/embeddings";
+    }
+
+    private float[] extractEmbedding(String responseBody) {
+        if (responseBody == null || responseBody.isBlank()) {
+            return null;
+        }
+        try {
+            JsonNode root = objectMapper.readTree(responseBody);
+            JsonNode data = root.path("data");
+            if (data.isArray() && data.size() > 0) {
+                JsonNode emb = data.get(0).path("embedding");
+                if (emb.isArray()) {
+                    float[] vec = new float[emb.size()];
+                    for (int i = 0; i < emb.size(); i++) {
+                        vec[i] = emb.get(i).floatValue();
+                    }
+                    return vec;
+                }
+            }
+            return null;
+        } catch (Exception e) {
+            log.warn("解析 Embedding 响应失败", e);
+            return null;
+        }
+    }
+
     private String extractContent(String responseBody) {
         if (responseBody == null || responseBody.isBlank()) {
             return "";

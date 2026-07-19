@@ -262,4 +262,19 @@ CREATE TABLE IF NOT EXISTS team_members (
 CREATE INDEX IF NOT EXISTS idx_team_members_team ON team_members(team_id);
 CREATE INDEX IF NOT EXISTS idx_team_members_user ON team_members(user_id);
 
-
+-- ============================================================
+-- 向量知识库（P5-1 pgvector 混合检索）
+-- ============================================================
+CREATE TABLE IF NOT EXISTS kb_documents (
+    id              BIGSERIAL PRIMARY KEY,
+    project_id      BIGINT       NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    source          VARCHAR(64)  NOT NULL DEFAULT 'IMA',   -- IMA / MANUAL / GENERATED
+    content         TEXT         NOT NULL,
+    chunk_index     INTEGER      NOT NULL DEFAULT 0,
+    embedding       vector(1536),
+    metadata_json   TEXT,
+    created_at      TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_kb_docs_project ON kb_documents(project_id);
+CREATE INDEX IF NOT EXISTS idx_kb_docs_source ON kb_documents(source);
+CREATE INDEX IF NOT EXISTS idx_kb_docs_embedding ON kb_documents USING hnsw (embedding vector_cosine_ops);
