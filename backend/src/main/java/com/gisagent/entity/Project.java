@@ -25,6 +25,10 @@ public class Project {
     @Column(name = "team_id")
     private Long teamId;
 
+    /** 所属组织（租户），用于跨组织数据隔离 */
+    @Column(name = "organization_id")
+    private Long organizationId;
+
     @Column(nullable = false, length = 256)
     private String name;
 

@@ -32,12 +32,14 @@ public class AuthDto {
         private String username;
         private Long userId;
         private String role;
+        private Long orgId;
 
-        public AuthResponse(String token, String username, Long userId, String role) {
+        public AuthResponse(String token, String username, Long userId, String role, Long orgId) {
             this.token = token;
             this.username = username;
             this.userId = userId;
             this.role = role;
+            this.orgId = orgId;
         }
     }
 }

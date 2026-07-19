@@ -1,6 +1,8 @@
 package com.gisagent.controller;
 
+import com.gisagent.entity.Organization;
 import com.gisagent.entity.User;
+import com.gisagent.repository.OrganizationRepository;
 import com.gisagent.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -11,12 +13,16 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 平台用户管理（P6-2，仅 SUPER_ADMIN 可访问）。
  * GET  /api/admin/users            用户列表（含角色/启用状态）
  * POST /api/admin/users/{id}/role  修改全局角色
  * POST /api/admin/users/{id}/toggle-enabled 启用/禁用账号
+ * GET  /api/admin/organizations    组织列表（P7-1 多租户）
+ * POST /api/admin/organizations    创建组织
+ * POST /api/admin/users/{id}/organization 设置用户所属组织
  */
 @RestController
 @RequestMapping("/api/admin")
@@ -24,6 +30,7 @@ import java.util.Map;
 public class AdminUserController {
 
     private final UserRepository userRepository;
+    private final OrganizationRepository organizationRepository;
 
     private Long requireSuperAdmin(Authentication auth) {
         if (auth == null || !(auth.getPrincipal() instanceof Long)) {
@@ -85,5 +92,53 @@ public class AdminUserController {
         target.setEnabled(!Boolean.TRUE.equals(target.getEnabled()));
         userRepository.save(target);
         return ResponseEntity.ok(Map.of("ok", true, "enabled", target.getEnabled()));
+    }
+
+    // ===== 组织（租户）管理（P7-1，仅 SUPER_ADMIN）=====
+
+    @GetMapping("/organizations")
+    public ResponseEntity<?> listOrganizations(Authentication auth) {
+        requireSuperAdmin(auth);
+        List<Map<String, Object>> orgs = organizationRepository.findAll().stream().map(o -> {
+            Map<String, Object> m = new java.util.LinkedHashMap<>();
+            m.put("id", o.getId());
+            m.put("name", o.getName());
+            m.put("slug", o.getSlug());
+            return m;
+        }).collect(Collectors.toList());
+        return ResponseEntity.ok(Map.of("organizations", orgs, "total", orgs.size()));
+    }
+
+    @PostMapping("/organizations")
+    public ResponseEntity<?> createOrganization(@RequestBody Map<String, String> body, Authentication auth) {
+        requireSuperAdmin(auth);
+        String name = body.get("name");
+        if (name == null || name.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "组织名称不能为空"));
+        }
+        if (organizationRepository.existsByName(name.trim())) {
+            return ResponseEntity.badRequest().body(Map.of("error", "组织已存在"));
+        }
+        Organization org = organizationRepository.save(Organization.builder()
+                .name(name.trim())
+                .slug("org-" + System.nanoTime())
+                .build());
+        return ResponseEntity.ok(Map.of("id", org.getId(), "name", org.getName(), "slug", org.getSlug()));
+    }
+
+    @PostMapping("/users/{id}/organization")
+    public ResponseEntity<?> setUserOrganization(@PathVariable Long id,
+                                                 @RequestBody Map<String, Long> body,
+                                                 Authentication auth) {
+        requireSuperAdmin(auth);
+        User target = userRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "用户不存在"));
+        Long orgId = body.get("organizationId");
+        if (orgId == null || !organizationRepository.existsById(orgId)) {
+            return ResponseEntity.badRequest().body(Map.of("error", "组织不存在"));
+        }
+        target.setOrganizationId(orgId);
+        userRepository.save(target);
+        return ResponseEntity.ok(Map.of("ok", true, "userId", id, "organizationId", orgId));
     }
 }

@@ -2,7 +2,9 @@ package com.gisagent.service;
 
 import com.gisagent.config.JwtTokenProvider;
 import com.gisagent.dto.AuthDto;
+import com.gisagent.entity.Organization;
 import com.gisagent.entity.User;
+import com.gisagent.repository.OrganizationRepository;
 import com.gisagent.repository.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -11,15 +13,26 @@ import org.springframework.stereotype.Service;
 public class AuthService {
 
     private final UserRepository userRepository;
+    private final OrganizationRepository organizationRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
 
     public AuthService(UserRepository userRepository,
+                       OrganizationRepository organizationRepository,
                        PasswordEncoder passwordEncoder,
                        JwtTokenProvider jwtTokenProvider) {
         this.userRepository = userRepository;
+        this.organizationRepository = organizationRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtTokenProvider = jwtTokenProvider;
+    }
+
+    /** 解析默认组织（不存在则创建），用于新注册用户归属 */
+    private Long defaultOrganizationId() {
+        Organization org = organizationRepository.findByName("默认组织")
+                .orElseGet(() -> organizationRepository.save(
+                        Organization.builder().name("默认组织").slug("default").build()));
+        return org.getId();
     }
 
     public AuthDto.AuthResponse register(AuthDto.RegisterRequest request) {
@@ -31,16 +44,18 @@ public class AuthService {
         boolean isFirst = userRepository.count() == 0;
         String role = isFirst ? "SUPER_ADMIN" : "USER";
 
+        Long orgId = defaultOrganizationId();
         User user = User.builder()
                 .username(request.getUsername())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .role(role)
                 .enabled(true)
+                .organizationId(orgId)
                 .build();
 
         user = userRepository.save(user);
-        String token = jwtTokenProvider.generateToken(user.getId(), user.getUsername(), user.getRole());
-        return new AuthDto.AuthResponse(token, user.getUsername(), user.getId(), user.getRole());
+        String token = jwtTokenProvider.generateToken(user.getId(), user.getUsername(), user.getRole(), orgId);
+        return new AuthDto.AuthResponse(token, user.getUsername(), user.getId(), user.getRole(), orgId);
     }
 
     public AuthDto.AuthResponse login(AuthDto.LoginRequest request) {
@@ -55,7 +70,8 @@ public class AuthService {
             throw new IllegalArgumentException("用户名或密码错误");
         }
 
-        String token = jwtTokenProvider.generateToken(user.getId(), user.getUsername(), user.getRole());
-        return new AuthDto.AuthResponse(token, user.getUsername(), user.getId(), user.getRole());
+        Long orgId = user.getOrganizationId() != null ? user.getOrganizationId() : defaultOrganizationId();
+        String token = jwtTokenProvider.generateToken(user.getId(), user.getUsername(), user.getRole(), orgId);
+        return new AuthDto.AuthResponse(token, user.getUsername(), user.getId(), user.getRole(), orgId);
     }
 }

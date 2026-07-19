@@ -22,7 +22,7 @@ public class JwtTokenProvider {
         this.expirationMs = expirationMs;
     }
 
-    public String generateToken(Long userId, String username, String role) {
+    public String generateToken(Long userId, String username, String role, Long orgId) {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + expirationMs);
 
@@ -30,6 +30,7 @@ public class JwtTokenProvider {
                 .subject(userId.toString())
                 .claim("username", username)
                 .claim("role", role)
+                .claim("orgId", orgId)
                 .issuedAt(now)
                 .expiration(expiry)
                 .signWith(key)
@@ -43,6 +44,18 @@ public class JwtTokenProvider {
                 .parseSignedClaims(token)
                 .getPayload();
         return Long.parseLong(claims.getSubject());
+    }
+
+    /** 解析 JWT 中的组织 ID（多租户隔离用）；无 claim 时返回 null。 */
+    public Long getOrganizationIdFromToken(String token) {
+        Claims claims = Jwts.parser()
+                .verifyWith(key)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+        Object v = claims.get("orgId");
+        if (v == null) return null;
+        return ((Number) v).longValue();
     }
 
     public boolean validateToken(String token) {

@@ -95,6 +95,7 @@ public class ProjectController {
         Project project = Project.builder()
                 .userId(userId)
                 .teamId(teamId)
+                .organizationId(com.gisagent.config.TenantContext.getOrganizationId())
                 .name(name)
                 .description(description)
                 .templateId(templateId)
@@ -135,12 +136,23 @@ public class ProjectController {
     @GetMapping
     public ResponseEntity<?> list(Authentication auth) {
         Long userId = (Long) auth.getPrincipal();
-        List<Project> projects = new ArrayList<>(projectRepository.findByUserId(userId));
-        // 同时返回我作为成员所属的团队项目（与个人项目不重叠：团队项目 teamId 非空）
-        List<TeamMember> memberships = teamMemberRepository.findByUserId(userId);
-        if (!memberships.isEmpty()) {
-            List<Long> teamIds = memberships.stream().map(TeamMember::getTeamId).toList();
-            projects.addAll(projectRepository.findByTeamIdIn(teamIds));
+        Long org = com.gisagent.config.TenantContext.getOrganizationId();
+        List<Project> projects;
+        if (org != null) {
+            // 多租户：仅返回当前组织内、属于自己或所属团队的项目
+            projects = new ArrayList<>(projectRepository.findByOrganizationIdAndUserId(org, userId));
+            List<TeamMember> memberships = teamMemberRepository.findByUserId(userId);
+            if (!memberships.isEmpty()) {
+                List<Long> teamIds = memberships.stream().map(TeamMember::getTeamId).toList();
+                projects.addAll(projectRepository.findByOrganizationIdAndTeamIdIn(org, teamIds));
+            }
+        } else {
+            projects = new ArrayList<>(projectRepository.findByUserId(userId));
+            List<TeamMember> memberships = teamMemberRepository.findByUserId(userId);
+            if (!memberships.isEmpty()) {
+                List<Long> teamIds = memberships.stream().map(TeamMember::getTeamId).toList();
+                projects.addAll(projectRepository.findByTeamIdIn(teamIds));
+            }
         }
         return ResponseEntity.ok(projects.stream().map(this::toResponse));
     }

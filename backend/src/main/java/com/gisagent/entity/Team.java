@@ -23,6 +23,10 @@ public class Team {
     @Column(name = "owner_id", nullable = false)
     private Long ownerId;
 
+    /** 所属组织（租户），用于跨组织数据隔离 */
+    @Column(name = "organization_id")
+    private Long organizationId;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

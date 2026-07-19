@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS users (
     enabled      BOOLEAN      NOT NULL DEFAULT TRUE,    -- 账号启用状态
     email        VARCHAR(128),
     display_name VARCHAR(64),
+    organization_id BIGINT,                       -- 所属组织（租户），P7-1 多租户隔离
     created_at   TIMESTAMP    NOT NULL DEFAULT NOW(),
     updated_at   TIMESTAMP    NOT NULL DEFAULT NOW()
 );
@@ -24,6 +25,20 @@ CREATE TABLE IF NOT EXISTS users (
 -- ============================================================
 -- LLM Provider 配置（用户级）
 -- ============================================================
+-- ============================================================
+-- 组织（租户）：多租户隔离单位（P7-1）
+-- ============================================================
+CREATE TABLE IF NOT EXISTS organizations (
+    id          BIGSERIAL PRIMARY KEY,
+    name        VARCHAR(128) NOT NULL,
+    slug        VARCHAR(64)  UNIQUE,
+    created_at  TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+-- 默认组织（幂等：仅首次插入，之后每次启动跳过）
+INSERT INTO organizations (name, slug)
+SELECT '默认组织', 'default'
+WHERE NOT EXISTS (SELECT 1 FROM organizations WHERE slug = 'default');
+
 CREATE TABLE IF NOT EXISTS llm_providers (
     id               BIGSERIAL PRIMARY KEY,
     user_id          BIGINT       NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -76,6 +91,7 @@ CREATE TABLE IF NOT EXISTS projects (
     template_id     VARCHAR(64),                     -- 使用的预置模板 ID（MVP 可为空）
     status          VARCHAR(32)  NOT NULL DEFAULT 'DRAFT', -- DRAFT | RUNNING | COMPLETED | FAILED
     context_json    JSONB,                            -- 共享上下文数据 (Context Bus)
+    organization_id BIGINT,                          -- 所属组织（租户），P7-1 多租户隔离
     created_at      TIMESTAMP    NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMP    NOT NULL DEFAULT NOW()
 );
@@ -250,6 +266,7 @@ CREATE TABLE IF NOT EXISTS teams (
     id          BIGSERIAL PRIMARY KEY,
     name        VARCHAR(128) NOT NULL,
     owner_id    BIGINT       NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    organization_id BIGINT,                          -- 所属组织（租户），P7-1 多租户隔离
     created_at  TIMESTAMP    NOT NULL DEFAULT NOW(),
     updated_at  TIMESTAMP    NOT NULL DEFAULT NOW()
 );

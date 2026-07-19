@@ -36,6 +36,10 @@ public class User {
     @Column(name = "display_name", length = 64)
     private String displayName;
 
+    /** 所属组织（租户）；多租户隔离单位。null 表示未分配（历史数据回填前） */
+    @Column(name = "organization_id")
+    private Long organizationId;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
