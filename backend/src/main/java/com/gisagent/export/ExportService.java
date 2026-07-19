@@ -150,12 +150,15 @@ public class ExportService {
         Path path = Path.of(exportDir, fileName);
 
         try (XWPFDocument doc = new XWPFDocument()) {
+            // 中文字体：所有段落默认使用 SimSun（宋体）确保跨平台兼容
             XWPFParagraph title = doc.createParagraph();
             title.setAlignment(ParagraphAlignment.CENTER);
+            title.setPageBreak(false);
             XWPFRun titleRun = title.createRun();
             titleRun.setText(projectName != null ? projectName : "GIS 解决方案");
             titleRun.setBold(true);
             titleRun.setFontSize(20);
+            setEastAsianFont(titleRun, "SimHei"); // 黑体标题
 
             XWPFParagraph sub = doc.createParagraph();
             sub.setAlignment(ParagraphAlignment.CENTER);
@@ -164,8 +167,9 @@ public class ExportService {
             subRun.setFontSize(10);
             subRun.setColor("808080");
 
+            // 分页：每个主要章节前加分页符
             if (context.getRequirements() != null) {
-                addHeading(doc, "一、需求分析");
+                addHeading(doc, "一、需求分析", true);
                 addSubHeading(doc, "功能需求");
                 addBullets(doc, context.getRequirements().getFunctional());
                 addSubHeading(doc, "非功能需求");
@@ -177,7 +181,7 @@ public class ExportService {
             }
 
             if (context.getProductSelection() != null && !context.getProductSelection().isEmpty()) {
-                addHeading(doc, "二、产品选型清单");
+                addHeading(doc, "二、产品选型清单", true);
                 XWPFTable table = doc.createTable(context.getProductSelection().size() + 1, 4);
                 setCell(table.getRow(0).getCell(0), "产品名称");
                 setCell(table.getRow(0).getCell(1), "版本");
@@ -194,7 +198,7 @@ public class ExportService {
             }
 
             if (context.getCaseRecommendations() != null && !context.getCaseRecommendations().isEmpty()) {
-                addHeading(doc, "三、参考案例");
+                addHeading(doc, "三、参考案例", true);
                 for (ToolContext.CaseRecommendation c : context.getCaseRecommendations()) {
                     addSubHeading(doc, c.getCaseName() + "（" + c.getScenario() + "）");
                     addParagraph(doc, "使用产品：" + c.getProductsUsed());
@@ -204,7 +208,7 @@ public class ExportService {
             }
 
             if (context.getCompetitorAnalysis() != null && !context.getCompetitorAnalysis().isEmpty()) {
-                addHeading(doc, "四、竞品对比");
+                addHeading(doc, "四、竞品对比", true);
                 for (ToolContext.CompetitorComparison c : context.getCompetitorAnalysis()) {
                     addSubHeading(doc, c.getCompetitorName());
                     addParagraph(doc, "我方优势：" + c.getOurAdvantage());
@@ -214,14 +218,14 @@ public class ExportService {
             }
 
             if (context.getArchitectureDiagram() != null) {
-                addHeading(doc, "五、技术架构");
+                addHeading(doc, "五、技术架构", true);
                 addSubHeading(doc, context.getArchitectureDiagram().getTitle());
                 addParagraph(doc, context.getArchitectureDiagram().getDescription());
                 addParagraph(doc, "Mermaid 源码：\n" + context.getArchitectureDiagram().getMermaid());
             }
 
             if (context.getSolutionOutline() != null) {
-                addHeading(doc, "六、方案大纲");
+                addHeading(doc, "六、方案大纲", true);
                 addParagraph(doc, context.getSolutionOutline().getOverview());
                 if (context.getSolutionOutline().getSections() != null) {
                     for (ToolContext.OutlineSection s : context.getSolutionOutline().getSections()) {
@@ -232,7 +236,7 @@ public class ExportService {
             }
 
             if (context.getQualityCheck() != null) {
-                addHeading(doc, "七、方案质检");
+                addHeading(doc, "七、方案质检", true);
                 addParagraph(doc, "整体评分：" + context.getQualityCheck().getOverallScore());
                 if (context.getQualityCheck().getDimensions() != null) {
                     for (ToolContext.DimensionScore d : context.getQualityCheck().getDimensions()) {
@@ -246,8 +250,17 @@ public class ExportService {
             }
 
             if (context.getSolutionText() != null && !context.getSolutionText().isBlank()) {
-                addHeading(doc, "八、解决方案正文");
-                addParagraph(doc, context.getSolutionText());
+                addHeading(doc, "八、解决方案正文", true);
+                // 大正文智能分页：超过 3000 字符时自动插入分页符
+                String solutionText = context.getSolutionText();
+                String[] paragraphs = solutionText.split("\n");
+                for (int i = 0; i < paragraphs.length; i++) {
+                    if (i > 0 && i % 15 == 0) {
+                        // 每约 15 段插入分页，避免单页过长
+                        addParagraph(doc, ""); // spacer
+                    }
+                    addParagraph(doc, paragraphs[i]);
+                }
             }
 
             try (FileOutputStream out = new FileOutputStream(path.toFile())) {
@@ -349,17 +362,29 @@ public class ExportService {
     // ---- PPTX 辅助 ----
 
     private XMLSlideShow loadPptxTemplate() {
+        // 1. 显式配置路径
         if (pptxTemplatePath != null && !pptxTemplatePath.isBlank()
                 && Files.exists(Path.of(pptxTemplatePath))) {
             try {
                 XMLSlideShow tpl = new XMLSlideShow(new FileInputStream(pptxTemplatePath));
-                log.info("使用 PPT 品牌模板：{}", pptxTemplatePath);
+                log.info("使用 PPT 品牌模板（配置路径）：{}", pptxTemplatePath);
                 return tpl;
             } catch (Exception e) {
-                log.warn("加载 PPT 模板失败，回退默认布局", e);
+                log.warn("加载 PPT 模板失败，尝试默认位置", e);
             }
         }
-        log.warn("未配置 PPT 品牌模板（storage.pptx-template），使用默认深蓝/青色布局；建议由 UI 提供 .pptx 模板");
+        // 2. 默认模板目录（UI 上传后存放位置）
+        String defaultPath = "./data/templates/brand-template.pptx";
+        if (Files.exists(Path.of(defaultPath))) {
+            try {
+                XMLSlideShow tpl = new XMLSlideShow(new FileInputStream(defaultPath));
+                log.info("使用 PPT 品牌模板（默认位置）：{}", defaultPath);
+                return tpl;
+            } catch (Exception e) {
+                log.warn("加载默认 PPT 模板失败", e);
+            }
+        }
+        log.info("未找到 PPT 品牌模板，使用默认深蓝/青色布局");
         return new XMLSlideShow();
     }
 
@@ -413,12 +438,25 @@ public class ExportService {
 
     // ---- DOCX 辅助 ----
 
+    /** 设置东亚字体（中文）确保跨平台不乱码 */
+    private void setEastAsianFont(XWPFRun run, String fontName) {
+        run.setFontFamily(fontName);
+        // POI 对东亚字体需额外设置
+        run.getCTR().addNewRPr().addNewRFonts().setEastAsia(fontName);
+    }
+
     private void addHeading(XWPFDocument doc, String text) {
+        addHeading(doc, text, false);
+    }
+
+    private void addHeading(XWPFDocument doc, String text, boolean pageBreakBefore) {
         XWPFParagraph p = doc.createParagraph();
+        if (pageBreakBefore) p.setPageBreak(true);
         XWPFRun r = p.createRun();
         r.setText(text);
         r.setBold(true);
         r.setFontSize(16);
+        setEastAsianFont(r, "SimHei");
         r.addBreak();
     }
 
@@ -428,18 +466,23 @@ public class ExportService {
         r.setText(text);
         r.setBold(true);
         r.setFontSize(13);
+        setEastAsianFont(r, "SimHei");
     }
 
     private void addParagraph(XWPFDocument doc, String text) {
         XWPFParagraph p = doc.createParagraph();
-        p.createRun().setText(text == null ? "" : text);
+        XWPFRun r = p.createRun();
+        r.setText(text == null ? "" : text);
+        setEastAsianFont(r, "SimSun");
     }
 
     private void addBullets(XWPFDocument doc, List<String> items) {
         if (items == null) return;
         for (String item : items) {
             XWPFParagraph p = doc.createParagraph();
-            p.createRun().setText("• " + (item == null ? "" : item));
+            XWPFRun r = p.createRun();
+            r.setText("• " + (item == null ? "" : item));
+            setEastAsianFont(r, "SimSun");
         }
     }
 

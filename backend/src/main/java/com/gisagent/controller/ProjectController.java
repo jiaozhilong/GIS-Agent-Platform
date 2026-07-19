@@ -12,6 +12,7 @@ import com.gisagent.repository.PipelineRunRepository;
 import com.gisagent.repository.TeamMemberRepository;
 import com.gisagent.repository.ToolExecutionRepository;
 import com.gisagent.service.TeamService;
+import lombok.extern.slf4j.Slf4j;
 import jakarta.annotation.PostConstruct;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
@@ -31,6 +32,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/projects")
+@Slf4j
 public class ProjectController {
 
     private final ProjectRepository projectRepository;
@@ -197,5 +199,43 @@ public class ProjectController {
         if (lower.endsWith(".docx")) return "DOCX";
         if (lower.endsWith(".doc")) return "DOC";
         return "TXT";
+    }
+
+    // ---- P5-2 PPT 品牌模板上传 ----
+
+    @Value("${storage.pptx-template-dir:./data/templates}")
+    private String pptxTemplateDir;
+
+    @PostMapping("/ppt-template")
+    public ResponseEntity<?> uploadPptTemplate(@RequestParam("file") MultipartFile file, Authentication auth) {
+        if (auth == null || auth.getPrincipal() == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "未登录"));
+        }
+        if (file.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "文件不能为空"));
+        }
+        String originalName = file.getOriginalFilename();
+        if (originalName == null || !originalName.toLowerCase().endsWith(".pptx")) {
+            return ResponseEntity.badRequest().body(Map.of("error", "仅支持 .pptx 格式的 PPT 模板"));
+        }
+
+        try {
+            File dir = new File(pptxTemplateDir);
+            if (!dir.isAbsolute()) {
+                dir = new File(System.getProperty("user.dir"), pptxTemplateDir);
+            }
+            dir.mkdirs();
+            File dest = new File(dir, "brand-template.pptx");
+            file.transferTo(dest);
+            log.info("PPT 品牌模板已上传: {}", dest.getAbsolutePath());
+            return ResponseEntity.ok(Map.of(
+                    "ok", true,
+                    "path", dest.getAbsolutePath(),
+                    "size", file.getSize()
+            ));
+        } catch (Exception e) {
+            log.error("PPT 模板上传失败", e);
+            return ResponseEntity.internalServerError().body(Map.of("error", "上传失败: " + e.getMessage()));
+        }
     }
 }
