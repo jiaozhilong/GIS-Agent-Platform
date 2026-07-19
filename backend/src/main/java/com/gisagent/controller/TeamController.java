@@ -1,6 +1,7 @@
 package com.gisagent.controller;
 
 import com.gisagent.service.TeamService;
+import com.gisagent.service.NotificationService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -14,9 +15,11 @@ import java.util.Map;
 public class TeamController {
 
     private final TeamService teamService;
+    private final NotificationService notificationService;
 
-    public TeamController(TeamService teamService) {
+    public TeamController(TeamService teamService, NotificationService notificationService) {
         this.teamService = teamService;
+        this.notificationService = notificationService;
     }
 
     private Long uid(Authentication auth) {
@@ -62,7 +65,16 @@ public class TeamController {
         Long uid = uid(auth);
         if (uid == null) return ResponseEntity.status(401).body(Map.of("message", "请先登录"));
         try {
-            return ResponseEntity.status(201).body(teamService.addMember(id, uid, body.get("username"), body.get("role")));
+            var result = teamService.addMember(id, uid, body.get("username"), body.get("role"));
+            // 通知被邀请用户
+            Long invitedId = result.get("userId") instanceof Number n ? n.longValue() : null;
+            if (invitedId != null) {
+                notificationService.send(invitedId, "TEAM_INVITE",
+                        "你被邀请加入团队",
+                        "你已被邀请加入团队，角色为 " + result.get("role"),
+                        "/teams");
+            }
+            return ResponseEntity.status(201).body(result);
         } catch (RuntimeException e) {
             return ResponseEntity.status(statusOf(e)).body(Map.of("message", e.getMessage()));
         }

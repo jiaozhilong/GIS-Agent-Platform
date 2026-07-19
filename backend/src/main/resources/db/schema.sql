@@ -278,3 +278,34 @@ CREATE TABLE IF NOT EXISTS kb_documents (
 CREATE INDEX IF NOT EXISTS idx_kb_docs_project ON kb_documents(project_id);
 CREATE INDEX IF NOT EXISTS idx_kb_docs_source ON kb_documents(source);
 CREATE INDEX IF NOT EXISTS idx_kb_docs_embedding ON kb_documents USING hnsw (embedding vector_cosine_ops);
+
+-- ============================================================
+-- 审计日志与通知中心（P5-4 / P5-5）
+-- ============================================================
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id           BIGSERIAL PRIMARY KEY,
+    user_id      BIGINT,
+    username     VARCHAR(64),
+    action       VARCHAR(64)  NOT NULL,
+    target_type  VARCHAR(64),
+    target_id    BIGINT,
+    detail       TEXT,
+    ip_address   VARCHAR(45),
+    created_at   TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_logs(action);
+CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_logs(created_at);
+
+CREATE TABLE IF NOT EXISTS notifications (
+    id           BIGSERIAL PRIMARY KEY,
+    user_id      BIGINT       NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type         VARCHAR(32)  NOT NULL,
+    title        VARCHAR(256) NOT NULL,
+    body         TEXT,
+    link         VARCHAR(512),
+    is_read      BOOLEAN      NOT NULL DEFAULT FALSE,
+    created_at   TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_notif_user ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notif_unread ON notifications(user_id, is_read);

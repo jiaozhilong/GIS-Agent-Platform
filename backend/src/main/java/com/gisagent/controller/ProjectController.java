@@ -12,6 +12,8 @@ import com.gisagent.repository.PipelineRunRepository;
 import com.gisagent.repository.TeamMemberRepository;
 import com.gisagent.repository.ToolExecutionRepository;
 import com.gisagent.service.TeamService;
+import com.gisagent.service.AuditService;
+import com.gisagent.service.NotificationService;
 import lombok.extern.slf4j.Slf4j;
 import jakarta.annotation.PostConstruct;
 import jakarta.validation.Valid;
@@ -41,6 +43,8 @@ public class ProjectController {
     private final ToolExecutionRepository toolExecutionRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final TeamService teamService;
+    private final AuditService auditService;
+    private final NotificationService notificationService;
 
     @Value("${storage.upload-dir:./data/uploads}")
     private String uploadDir;
@@ -58,13 +62,17 @@ public class ProjectController {
                              PipelineRunRepository pipelineRunRepository,
                              ToolExecutionRepository toolExecutionRepository,
                              TeamMemberRepository teamMemberRepository,
-                             TeamService teamService) {
+                             TeamService teamService,
+                             AuditService auditService,
+                             NotificationService notificationService) {
         this.projectRepository = projectRepository;
         this.documentRepository = documentRepository;
         this.pipelineRunRepository = pipelineRunRepository;
         this.toolExecutionRepository = toolExecutionRepository;
         this.teamMemberRepository = teamMemberRepository;
         this.teamService = teamService;
+        this.auditService = auditService;
+        this.notificationService = notificationService;
     }
 
     @PostMapping
@@ -117,6 +125,9 @@ public class ProjectController {
                 return ResponseEntity.badRequest().body(Map.of("error", "文件保存失败: " + e.getMessage()));
             }
         }
+
+        auditService.log(userId, null, "CREATE_PROJECT", "PROJECT", project.getId(),
+                "{\"name\":\"" + project.getName() + "\",\"templateId\":\"" + templateId + "\"}", null);
 
         return ResponseEntity.ok(toResponse(project));
     }
