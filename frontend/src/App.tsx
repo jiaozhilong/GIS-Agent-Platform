@@ -53,6 +53,7 @@ function App() {
             <Route path="templates" element={<TemplatesPage />} />
             <Route path="teams" element={<TeamsPage />} />
             <Route path="stats" element={<StatsPage />} />
+            {/* P7-3 用量计费看板 */}
             <Route path="usage" element={<UsagePage />} />
             <Route path="orchestrate" element={<OrchestratePage />} />
             <Route path="profile" element={<UserProfilePage />} />
