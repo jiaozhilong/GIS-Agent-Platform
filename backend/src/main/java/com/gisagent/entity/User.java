@@ -22,6 +22,20 @@ public class User {
     @Column(nullable = false, length = 256)
     private String password;
 
+    /** 平台全局角色：SUPER_ADMIN / ADMIN / USER（区别于团队级 Role） */
+    @Column(nullable = false, length = 16)
+    private String role = "USER";
+
+    /** 账号是否启用（禁用后无法登录） */
+    @Column(nullable = false)
+    private Boolean enabled = true;
+
+    @Column(length = 128)
+    private String email;
+
+    @Column(name = "display_name", length = 64)
+    private String displayName;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

@@ -15,6 +15,9 @@ import TemplatesPage from './pages/TemplatesPage';
 import TeamsPage from './pages/TeamsPage';
 import StatsPage from './pages/StatsPage';
 import OrchestratePage from './pages/OrchestratePage';
+import UsersAdminPage from './pages/UsersAdminPage';
+import UserProfilePage from './pages/UserProfilePage';
+import AuditPage from './pages/AuditPage';
 import { useAuthStore } from './stores/authStore';
 
 function PrivateRoute({ children }: { children: ReactNode }) {
@@ -50,6 +53,9 @@ function App() {
             <Route path="teams" element={<TeamsPage />} />
             <Route path="stats" element={<StatsPage />} />
             <Route path="orchestrate" element={<OrchestratePage />} />
+            <Route path="profile" element={<UserProfilePage />} />
+            <Route path="admin/users" element={<UsersAdminPage />} />
+            <Route path="admin/audit" element={<AuditPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>

@@ -1,5 +1,6 @@
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
+import TopBar from './TopBar';
 import '../styles/layout.css';
 
 export default function MainLayout() {
@@ -7,6 +8,7 @@ export default function MainLayout() {
     <div className="app-shell">
       <Sidebar />
       <main className="main-area">
+        <TopBar />
         <Outlet />
       </main>
     </div>

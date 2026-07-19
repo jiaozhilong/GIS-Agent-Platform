@@ -4,7 +4,9 @@ interface AuthState {
   token: string | null;
   username: string | null;
   userId: number | null;
-  setAuth: (token: string, username: string, userId: number) => void;
+  role: string | null;
+  setAuth: (token: string, username: string, userId: number, role?: string) => void;
+  setRole: (role: string) => void;
   logout: () => void;
 }
 
@@ -12,18 +14,26 @@ export const useAuthStore = create<AuthState>((set) => ({
   token: localStorage.getItem('token'),
   username: localStorage.getItem('username'),
   userId: localStorage.getItem('userId') ? Number(localStorage.getItem('userId')) : null,
+  role: localStorage.getItem('role'),
 
-  setAuth: (token, username, userId) => {
+  setAuth: (token, username, userId, role) => {
     localStorage.setItem('token', token);
     localStorage.setItem('username', username);
     localStorage.setItem('userId', String(userId));
-    set({ token, username, userId });
+    if (role) localStorage.setItem('role', role);
+    set({ token, username, userId, role: role ?? null });
+  },
+
+  setRole: (role) => {
+    localStorage.setItem('role', role);
+    set({ role });
   },
 
   logout: () => {
     localStorage.removeItem('token');
     localStorage.removeItem('username');
     localStorage.removeItem('userId');
-    set({ token: null, username: null, userId: null });
+    localStorage.removeItem('role');
+    set({ token: null, username: null, userId: null, role: null });
   },
 }));

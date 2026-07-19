@@ -47,6 +47,12 @@ export const IconWand = (p: IconProps) => (
 export const IconLock = (p: IconProps) => (
   <svg {...base(p)}><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
 );
+export const IconShield = (p: IconProps) => (
+  <svg {...base(p)}><path d="M12 2l8 3v6c0 5-3.5 8.5-8 11-4.5-2.5-8-6-8-11V5z"/><path d="M9 12l2 2 4-4"/></svg>
+);
+export const IconBell = (p: IconProps) => (
+  <svg {...base(p)}><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+);
 export const IconPlus = (p: IconProps) => (
   <svg {...base(p)}><path d="M12 5v14M5 12h14"/></svg>
 );

@@ -292,6 +292,50 @@ button { cursor: pointer; border: none; background: none; }
 .app-shell { display: grid; grid-template-columns: var(--sidebar-w) 1fr; min-height: 100vh; }
 .main-area { grid-column: 2; padding: 32px 40px; min-width: 0; }
 
+/* ===== 顶栏 + 通知中心 ===== */
+.topbar { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin: -8px 0 8px; }
+.topbar-spacer { flex: 1; }
+
+.notif-wrap { position: relative; }
+.notif-bell {
+  position: relative; display: grid; place-items: center;
+  width: 40px; height: 40px; border-radius: 12px;
+  background: rgba(255, 255, 255, .04); border: 1px solid var(--line);
+  color: var(--text); cursor: pointer; transition: all .18s var(--ease);
+}
+.notif-bell:hover { border-color: var(--mint); color: var(--mint); background: rgba(112, 241, 170, .08); }
+.notif-badge {
+  position: absolute; top: -5px; right: -5px; min-width: 18px; height: 18px;
+  padding: 0 5px; border-radius: 9px; background: var(--mint); color: #062018;
+  font-size: 11px; font-weight: 760; line-height: 18px; text-align: center;
+}
+.notif-panel {
+  position: absolute; top: 48px; right: 0; width: 320px; z-index: 50;
+  background: var(--panel); border: 1px solid var(--line-strong); border-radius: 14px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .45); overflow: hidden;
+}
+.notif-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 12px 16px; border-bottom: 1px solid var(--line);
+  font-size: 13px; font-weight: 700;
+}
+.notif-readall {
+  font-size: 12px; color: var(--mint); background: none; border: none; cursor: pointer;
+}
+.notif-readall:disabled { color: var(--muted-2); cursor: not-allowed; }
+.notif-list { max-height: 360px; overflow-y: auto; }
+.notif-empty { padding: 28px 16px; text-align: center; color: var(--muted-2); font-size: 13px; }
+.notif-item { padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.notif-item.unread { background: rgba(112, 241, 170, .06); }
+.notif-item:last-child { border-bottom: none; }
+.notif-title { font-size: 13px; font-weight: 640; color: var(--text); }
+.notif-body { font-size: 12px; color: var(--muted); margin-top: 3px; line-height: 1.5; }
+.notif-time { font-size: 11px; margin-top: 6px; }
+.notif-item.unread .notif-title::before {
+  content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--mint); margin-right: 7px; vertical-align: middle;
+}
+
 .page-head {
   display: flex; justify-content: space-between; align-items: flex-start;
   margin-bottom: 32px; gap: 16px; flex-wrap: wrap;

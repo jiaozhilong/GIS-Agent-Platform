@@ -39,6 +39,32 @@ export const authApi = {
     apiClient.post('/auth/register', { username, password }),
 };
 
+// ===== 用户管理（P6-2 平台管理员）=====
+export const adminApi = {
+  listUsers: () => apiClient.get('/admin/users'),
+  changeRole: (id: number, role: string) => apiClient.post(`/admin/users/${id}/role`, { role }),
+  toggleEnabled: (id: number) => apiClient.post(`/admin/users/${id}/toggle-enabled`),
+};
+
+// ===== 当前用户（P6-3）=====
+export const userApi = {
+  me: () => apiClient.get('/users/me'),
+  updateProfile: (data: { displayName?: string; email?: string }) => apiClient.post('/users/me', data),
+  changePassword: (oldPassword: string, newPassword: string) =>
+    apiClient.post('/users/me/password', { oldPassword, newPassword }),
+};
+
+// ===== 审计日志（P5-4）=====
+export const auditApi = {
+  list: (limit = 50) => apiClient.get(`/audit?limit=${limit}`),
+};
+
+// ===== 通知中心（P5-5）=====
+export const notificationApi = {
+  summary: () => apiClient.get('/notifications'),
+  readAll: () => apiClient.post('/notifications/read-all'),
+};
+
 // ===== LLM Provider API =====
 export const llmApi = {
   list: () => apiClient.get('/providers'),

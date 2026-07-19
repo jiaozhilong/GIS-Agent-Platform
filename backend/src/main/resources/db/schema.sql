@@ -10,11 +10,15 @@ CREATE EXTENSION IF NOT EXISTS vector;
 -- 用户表
 -- ============================================================
 CREATE TABLE IF NOT EXISTS users (
-    id          BIGSERIAL PRIMARY KEY,
-    username    VARCHAR(64)  NOT NULL UNIQUE,
-    password    VARCHAR(256) NOT NULL,               -- BCrypt hash
-    created_at  TIMESTAMP    NOT NULL DEFAULT NOW(),
-    updated_at  TIMESTAMP    NOT NULL DEFAULT NOW()
+    id           BIGSERIAL PRIMARY KEY,
+    username     VARCHAR(64)  NOT NULL UNIQUE,
+    password     VARCHAR(256) NOT NULL,              -- BCrypt hash
+    role         VARCHAR(16)  NOT NULL DEFAULT 'USER',  -- 平台全局角色 SUPER_ADMIN/ADMIN/USER
+    enabled      BOOLEAN      NOT NULL DEFAULT TRUE,    -- 账号启用状态
+    email        VARCHAR(128),
+    display_name VARCHAR(64),
+    created_at   TIMESTAMP    NOT NULL DEFAULT NOW(),
+    updated_at   TIMESTAMP    NOT NULL DEFAULT NOW()
 );
 
 -- ============================================================

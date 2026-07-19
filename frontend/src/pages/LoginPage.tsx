@@ -55,11 +55,11 @@ export default function LoginPage() {
     try {
       if (isRegister) {
         const { data } = await authApi.register(username.trim(), password);
-        setAuth(data.token, data.username, data.userId);
+        setAuth(data.token, data.username, data.userId, data.role);
         showToast('注册成功，欢迎加入 GeoAgent Studio');
       } else {
         const { data } = await authApi.login(username.trim(), password);
-        setAuth(data.token, data.username, data.userId);
+        setAuth(data.token, data.username, data.userId, data.role);
         showToast('登录成功，正在进入工作台');
       }
       navigate('/dashboard');
