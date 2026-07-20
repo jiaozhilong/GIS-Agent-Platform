@@ -15,6 +15,7 @@ import TemplatesPage from './pages/TemplatesPage';
 import TeamsPage from './pages/TeamsPage';
 import StatsPage from './pages/StatsPage';
 import UsagePage from './pages/UsagePage';
+import BillingPage from './pages/BillingPage';
 import OrchestratePage from './pages/OrchestratePage';
 import UsersAdminPage from './pages/UsersAdminPage';
 import UserProfilePage from './pages/UserProfilePage';
@@ -55,6 +56,8 @@ function App() {
             <Route path="stats" element={<StatsPage />} />
             {/* P7-3 用量计费看板 */}
             <Route path="usage" element={<UsagePage />} />
+            {/* P8-1 计费纵深：配额与账单 */}
+            <Route path="billing" element={<BillingPage />} />
             <Route path="orchestrate" element={<OrchestratePage />} />
             <Route path="profile" element={<UserProfilePage />} />
             <Route path="admin/users" element={<UsersAdminPage />} />

@@ -333,3 +333,36 @@ CREATE TABLE IF NOT EXISTS notifications (
 );
 CREATE INDEX IF NOT EXISTS idx_notif_user ON notifications(user_id);
 CREATE INDEX IF NOT EXISTS idx_notif_unread ON notifications(user_id, is_read);
+
+-- ============================================================
+-- 计费纵深：组织配额与账期账单（P8-1）
+-- ============================================================
+CREATE TABLE IF NOT EXISTS usage_quotas (
+    id              BIGSERIAL PRIMARY KEY,
+    organization_id BIGINT       NOT NULL,
+    token_limit     BIGINT       NOT NULL,               -- 该组织每月 token 预算
+    warn_threshold  INT          NOT NULL DEFAULT 80,     -- 告警阈值百分比 0-100
+    alerted_month   VARCHAR(16),                          -- 已告警账期 yyyy-MM（同月去重）
+    created_at      TIMESTAMP    NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMP    NOT NULL DEFAULT NOW(),
+    UNIQUE(organization_id)
+);
+
+CREATE TABLE IF NOT EXISTS invoices (
+    id              BIGSERIAL PRIMARY KEY,
+    organization_id BIGINT       NOT NULL,
+    period_month    VARCHAR(16)  NOT NULL,               -- 账期 yyyy-MM
+    run_count       BIGINT       NOT NULL DEFAULT 0,
+    input_tokens    BIGINT       NOT NULL DEFAULT 0,
+    output_tokens   BIGINT       NOT NULL DEFAULT 0,
+    total_tokens    BIGINT       NOT NULL DEFAULT 0,
+    estimated_cost  DOUBLE PRECISION NOT NULL DEFAULT 0,  -- 估算费用（元）
+    status          VARCHAR(16)  NOT NULL DEFAULT 'DRAFT', -- DRAFT | SETTLED
+    created_at      TIMESTAMP    NOT NULL DEFAULT NOW(),
+    settled_at      TIMESTAMP,
+    UNIQUE(organization_id, period_month)
+);
+
+CREATE INDEX IF NOT EXISTS idx_usage_quotas_org ON usage_quotas(organization_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_org ON invoices(organization_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_month ON invoices(period_month);

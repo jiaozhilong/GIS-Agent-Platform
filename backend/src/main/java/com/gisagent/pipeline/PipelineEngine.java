@@ -10,6 +10,7 @@ import com.gisagent.repository.*;
 import com.gisagent.service.LlmService;
 import com.gisagent.service.LlmUsage;
 import com.gisagent.service.EmbeddingService;
+import com.gisagent.service.BillingService;
 import com.gisagent.util.FileTextExtractor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -44,6 +45,7 @@ public class PipelineEngine {
     private final PipelineTemplateRepository templateRepository;
     private final com.gisagent.service.ProjectVersionService versionService;
     private final EmbeddingService embeddingService;
+    private final BillingService billingService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /** toolType → 实际工具实例，用于按模板工具链解析 */
@@ -85,7 +87,8 @@ public class PipelineEngine {
                           ExportService exportService,
                           PipelineTemplateRepository templateRepository,
                           com.gisagent.service.ProjectVersionService versionService,
-                          EmbeddingService embeddingService) {
+                          EmbeddingService embeddingService,
+                          BillingService billingService) {
         this.requirementAnalysisTool = requirementAnalysisTool;
         this.productMatchingTool = productMatchingTool;
         this.caseRecommendTool = caseRecommendTool;
@@ -101,6 +104,7 @@ public class PipelineEngine {
         this.templateRepository = templateRepository;
         this.versionService = versionService;
         this.embeddingService = embeddingService;
+        this.billingService = billingService;
 
         TOOL_BY_TYPE.put("REQUIREMENT_ANALYSIS", requirementAnalysisTool);
         TOOL_BY_TYPE.put("PRODUCT_MATCHING", productMatchingTool);
@@ -288,6 +292,12 @@ public class PipelineEngine {
         run.setFinishedAt(Instant.now());
         run.setContextJson(toJson(context.toMap()));
         pipelineRunRepository.save(run);
+        // P8-1 计费纵深：运行结束后检查组织配额（非核心流程，异常吞掉）
+        try {
+            billingService.afterRun(run.getProjectId());
+        } catch (Exception e) {
+            log.warn("配额检查异常（不影响主流程）: {}", e.getMessage());
+        }
     }
 
     /**
@@ -412,6 +422,12 @@ public class PipelineEngine {
         run.setFinishedAt(Instant.now());
         run.setStatus(anyFailed ? "PARTIAL" : "SUCCESS");
         pipelineRunRepository.save(run);
+        // P8-1 计费纵深：下游重跑额外消耗 token，同样触发配额检查
+        try {
+            billingService.afterRun(projectId);
+        } catch (Exception e) {
+            log.warn("重跑配额检查异常（不影响主流程）: {}", e.getMessage());
+        }
 
         // 版本快照：下游重跑成功后留档
         if (!"FAILED".equals(run.getStatus())) {

@@ -282,3 +282,54 @@
   .usage-grid .content-grid { grid-template-columns: 1fr; }
   .dim-row { grid-template-columns: 1.4fr 1fr 1fr; }
 }
+
+/* ===== 计费账单页（P8-1 计费纵深）===== */
+.quota-panel .panel-head { display: flex; align-items: center; justify-content: space-between; }
+.quota-meta {
+  display: flex; gap: 22px; flex-wrap: wrap; font-size: 13px; color: var(--muted);
+  margin-bottom: 16px;
+}
+.quota-meta b { color: var(--text); margin-left: 4px; font-variant-numeric: tabular-nums; }
+/* 配额进度条 */
+.quota-bar {
+  position: relative; height: 14px; border-radius: 999px;
+  background: rgba(255, 255, 255, .06); overflow: hidden;
+  border: 1px solid var(--line);
+}
+.quota-bar-fill {
+  height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--mint), var(--cyan));
+  transition: width .5s cubic-bezier(.16, 1, .3, 1);
+}
+.quota-bar.warn .quota-bar-fill { background: linear-gradient(90deg, #ffcf8a, #ff8f6b); }
+.quota-bar-mark {
+  position: absolute; top: -3px; width: 2px; height: 20px;
+  background: var(--muted-2); border-radius: 2px;
+}
+.quota-bar-legend {
+  display: flex; justify-content: space-between; font-size: 11px;
+  color: var(--muted-2); margin-top: 8px;
+}
+.quota-bar-legend .over { color: #ff8f6b; font-weight: 700; }
+/* 配额设置表单 */
+.quota-form { display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap; }
+.quota-form .date-field input { width: 180px; }
+.quota-form-actions { display: flex; gap: 10px; }
+.empty-state.compact { padding: 28px 18px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.empty-state.compact svg { margin: 0; width: 36px; height: 36px; }
+.empty-state.compact p { margin: 0; }
+/* 账单表格（超管 6 列 / 普通用户 5 列） */
+.billing-table .dim-row { grid-template-columns: 0.8fr 1fr 0.9fr 1.1fr 0.9fr 0.8fr; }
+.billing-table-single .dim-row { grid-template-columns: 1fr 0.9fr 1.1fr 0.9fr 0.8fr; }
+.status-pill {
+  display: inline-block; padding: 2px 10px; border-radius: 999px;
+  font-size: 11px; font-weight: 700; line-height: 1.6;
+}
+.status-pill.ok { background: rgba(146, 246, 190, .14); color: var(--mint); }
+.status-pill.draft { background: rgba(94, 230, 225, .12); color: var(--cyan); }
+.gen-result {
+  font-size: 13px; color: var(--muted); margin-bottom: 14px; padding: 10px 14px;
+  border: 1px solid var(--line); border-radius: var(--radius-sm); background: rgba(146, 246, 190, .05);
+}
+.gen-result b { color: var(--mint); }
+

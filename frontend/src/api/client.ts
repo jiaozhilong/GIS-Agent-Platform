@@ -148,6 +148,27 @@ export const usageApi = {
     apiClient.get('/usage/summary', { params: { ...params } }),
 };
 
+// ===== 计费纵深 API（P8-1）=====
+export const billingApi = {
+  // 查看配额：超管可传 orgId 查看任意组织；普通用户看本组织
+  getQuota: (orgId?: number) =>
+    apiClient.get('/billing/quota', { params: orgId ? { orgId } : {} }),
+  // 设置配额（仅 SUPER_ADMIN）
+  setQuota: (data: { organizationId: number; tokenLimit: number; warnThreshold?: number }) =>
+    apiClient.put('/billing/quota', data),
+  // 查看账单：超管传 orgId 看指定组织，不传看全部
+  getInvoices: (orgId?: number) =>
+    apiClient.get('/billing/invoices', { params: orgId ? { orgId } : {} }),
+  // 按月生成账单（仅 SUPER_ADMIN），month 默认当月 yyyy-MM
+  generate: (month?: string) =>
+    apiClient.post('/billing/invoices/generate', {}, { params: month ? { month } : {} }),
+};
+
+// ===== 组织（租户）管理 API（P7-1，仅 SUPER_ADMIN）=====
+export const orgApi = {
+  list: () => apiClient.get('/admin/organizations'),
+};
+
 // ===== Agent 自编排 API（P4-5）=====
 export const orchestrateApi = {
   // 根据自然语言需求推荐有序工具链；返回 { reason, toolChain, model, usedFallback }

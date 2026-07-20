@@ -11,6 +11,7 @@ const navItems = [
   { to: '/teams', label: '团队空间', icon: IconTeam, section: '协作' },
   { to: '/stats', label: '数据看板', icon: IconStats, section: '协作' },
   { to: '/usage', label: '用量计费', icon: IconUsage, section: '协作' },
+  { to: '/billing', label: '计费账单', icon: IconUsage, section: '协作' },
   { to: '/settings/llm', label: '大模型配置', icon: IconBrain, section: 'AI 配置' },
   { to: '/settings/ima', label: 'IMA 知识库', icon: IconBook, section: 'AI 配置' },
   { to: '/pipeline', label: '流程编排', icon: IconFlow, section: '方案工作流' },
