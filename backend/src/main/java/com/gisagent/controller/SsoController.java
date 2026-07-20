@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.client.RestTemplate;
 
 import java.net.URI;
@@ -60,16 +61,19 @@ public class SsoController {
         return exp != null && exp > Instant.now().toEpochMilli();
     }
 
-    /** 发起 SSO 授权：重定向到身份源 authorize 端点 */
+    /** 发起 SSO 授权：重定向到身份源 authorize 端点（mock 模式指向内置 mock IdP） */
     @GetMapping("/authorize")
-    public ResponseEntity<Void> authorize() {
+    public ResponseEntity<Void> authorize(HttpServletRequest request) {
         if (!sso.isEnabled()) {
             return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED)
                     .header("X-Error", "SSO 未启用").build();
         }
         String state = newState();
-        String url = sso.getAuthorizeUrl()
-                + "?client_id=" + sso.getClientId()
+        String idpAuthorize = sso.isMock()
+                ? request.getScheme() + "://" + request.getServerName() + ":" + request.getServerPort() + "/api/sso/mock/authorize"
+                : sso.getAuthorizeUrl();
+        String url = idpAuthorize
+                + "?client_id=" + (sso.getClientId() == null ? "" : sso.getClientId())
                 + "&redirect_uri=" + encode(sso.getRedirectUri())
                 + "&response_type=code"
                 + "&scope=" + encode(sso.getScope())
@@ -83,43 +87,64 @@ public class SsoController {
         return ResponseEntity.ok(Map.of("enabled", sso.isEnabled()));
     }
 
-    /** 身份源回调：换码 → 取用户信息 → 关联/新建用户 → 回前端带 token */
+    /** 身份源回调：换码 → 取用户信息 → 关联/新建用户 → 回前端带 token（mock 模式走内置 IdP） */
     @GetMapping("/callback")
     public ResponseEntity<Void> callback(@RequestParam("code") String code,
-                                         @RequestParam(value = "state", required = false) String state) {
+                                         @RequestParam(value = "state", required = false) String state,
+                                         HttpServletRequest request) {
         if (!validState(state)) {
             return redirectFrontend("error", "invalid_state");
         }
+        String base = request.getScheme() + "://" + request.getServerName() + ":" + request.getServerPort();
         try {
-            // 1. 用 code 换 access_token
-            String tokenBody = "grant_type=authorization_code"
-                    + "&code=" + code
-                    + "&redirect_uri=" + sso.getRedirectUri()
-                    + "&client_id=" + sso.getClientId()
-                    + "&client_secret=" + sso.getClientSecret();
-            ResponseEntity<String> tokResp = rest.postForEntity(sso.getTokenUrl(),
-                    jsonFormEntity(tokenBody), String.class);
-            if (!tokResp.getStatusCode().is2xxSuccessful() || tokResp.getBody() == null) {
-                return redirectFrontend("error", "token_failed");
-            }
-            Map<?, ?> tok = om.readValue(tokResp.getBody(), Map.class);
-            String accessToken = (String) tok.get("access_token");
-            if (accessToken == null) return redirectFrontend("error", "no_access_token");
+            String email;
+            String name;
+            if (sso.isMock()) {
+                // 内置 mock IdP：直接换码 + 取用户信息
+                ResponseEntity<String> tokResp = rest.postForEntity(base + "/api/sso/mock/token",
+                        jsonFormEntity("grant_type=authorization_code"), String.class);
+                if (!tokResp.getStatusCode().is2xxSuccessful() || tokResp.getBody() == null)
+                    return redirectFrontend("error", "token_failed");
+                Map<?, ?> tok = om.readValue(tokResp.getBody(), Map.class);
+                String accessToken = (String) tok.get("access_token");
+                if (accessToken == null) return redirectFrontend("error", "no_access_token");
+                ResponseEntity<String> infoResp = rest.getForEntity(
+                        base + "/api/sso/mock/userinfo?access_token=" + accessToken, String.class);
+                if (!infoResp.getStatusCode().is2xxSuccessful() || infoResp.getBody() == null)
+                    return redirectFrontend("error", "userinfo_failed");
+                Map<?, ?> info = om.readValue(infoResp.getBody(), Map.class);
+                email = (String) info.get(sso.getEmailField());
+                name = (String) info.get(sso.getNameField());
+            } else {
+                // 真实 IdP：标准授权码换码
+                String tokenBody = "grant_type=authorization_code"
+                        + "&code=" + code
+                        + "&redirect_uri=" + sso.getRedirectUri()
+                        + "&client_id=" + sso.getClientId()
+                        + "&client_secret=" + sso.getClientSecret();
+                ResponseEntity<String> tokResp = rest.postForEntity(sso.getTokenUrl(),
+                        jsonFormEntity(tokenBody), String.class);
+                if (!tokResp.getStatusCode().is2xxSuccessful() || tokResp.getBody() == null) {
+                    return redirectFrontend("error", "token_failed");
+                }
+                Map<?, ?> tok = om.readValue(tokResp.getBody(), Map.class);
+                String accessToken = (String) tok.get("access_token");
+                if (accessToken == null) return redirectFrontend("error", "no_access_token");
 
-            // 2. 取用户信息
-            ResponseEntity<String> infoResp = rest.getForEntity(
-                    sso.getUserInfoUrl() + "?access_token=" + accessToken, String.class);
-            if (!infoResp.getStatusCode().is2xxSuccessful() || infoResp.getBody() == null) {
-                return redirectFrontend("error", "userinfo_failed");
+                ResponseEntity<String> infoResp = rest.getForEntity(
+                        sso.getUserInfoUrl() + "?access_token=" + accessToken, String.class);
+                if (!infoResp.getStatusCode().is2xxSuccessful() || infoResp.getBody() == null) {
+                    return redirectFrontend("error", "userinfo_failed");
+                }
+                Map<?, ?> info = om.readValue(infoResp.getBody(), Map.class);
+                email = (String) info.get(sso.getEmailField());
+                name = (String) info.get(sso.getNameField());
             }
-            Map<?, ?> info = om.readValue(infoResp.getBody(), Map.class);
-            String email = (String) info.get(sso.getEmailField());
-            String name = (String) info.get(sso.getNameField());
             if (email == null || email.isBlank()) {
                 return redirectFrontend("error", "no_email");
             }
 
-            // 3. 关联/新建用户并签发 JWT
+            // 关联/新建用户并签发 JWT
             AuthDto.AuthResponse auth = authService.ssoLogin(email, name);
             return redirectFrontend("sso_token", auth.getToken());
         } catch (Exception e) {
