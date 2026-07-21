@@ -133,7 +133,7 @@ public class PipelineEngine {
      * 每个工具带超时控制（120s）和失败重试（1 次）。
      */
     public void run(Long pipelineRunId, Long projectId, String templateId, PipelineTool.LlmConfig llmConfig,
-                    String triggerType) {
+                    String triggerType, List<Long> kbConfigIds) {
         PipelineRun run = pipelineRunRepository.findById(pipelineRunId)
                 .orElseThrow(() -> new IllegalArgumentException("流水线不存在"));
 
@@ -147,6 +147,8 @@ public class PipelineEngine {
         context.setRequirementDoc(loadRequirementDoc(projectId));
         // 按用户隔离 IMA：把触发用户 ID 写入上下文（供工具链检索该用户自己的知识库）
         projectRepository.findById(projectId).ifPresent(p -> context.setUserId(p.getUserId()));
+        // 运行时指定的知识库过滤（空表示使用所有启用库，向后兼容）
+        context.setKbConfigIds(kbConfigIds);
 
         // 构建 toolType → 执行记录 映射
         Map<String, ToolExecution> execMap = new LinkedHashMap<>();

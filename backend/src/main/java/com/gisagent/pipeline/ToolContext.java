@@ -57,6 +57,10 @@ public class ToolContext {
     @JsonIgnore
     private Long userId;
 
+    /** 本次运行指定的知识库配置 ID（为空表示使用所有启用库）；不序列化 */
+    @JsonIgnore
+    private List<Long> kbConfigIds;
+
     @Data
     @NoArgsConstructor
     @AllArgsConstructor

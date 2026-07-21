@@ -63,16 +63,24 @@ public class PipelineController {
         this.encryptionService = encryptionService;
     }
 
-    /** 启动流水线执行 */
+    /** 启动流水线执行（支持运行时选择模型和知识库） */
     @PostMapping("/{id}/run")
-    public ResponseEntity<?> run(@PathVariable Long id, Authentication auth) {
+    public ResponseEntity<?> run(@PathVariable Long id, Authentication auth,
+                                 @RequestBody(required = false) ProjectDto.PipelineRunRequest req) {
         Long userId = (Long) auth.getPrincipal();
         teamService.requireProjectRole(id, userId, Role.EDITOR);
         Project project = projectRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "项目不存在"));
 
-        // 获取用户的默认 LLM Provider
-        Optional<LlmProvider> providerOpt = llmProviderRepository.findByUserIdAndIsDefaultTrue(userId).stream().findFirst();
+        req = req != null ? req : new ProjectDto.PipelineRunRequest();
+
+        // 选择 LLM Provider：优先用请求指定的 providerId，否则用用户默认
+        Optional<LlmProvider> providerOpt;
+        if (req.getProviderId() != null) {
+            providerOpt = llmProviderRepository.findByIdAndUserId(req.getProviderId(), userId);
+        } else {
+            providerOpt = llmProviderRepository.findByUserIdAndIsDefaultTrue(userId).stream().findFirst();
+        }
         if (providerOpt.isEmpty()) {
             providerOpt = llmProviderRepository.findByUserId(userId).stream().findFirst();
         }
@@ -80,6 +88,9 @@ public class PipelineController {
             return ResponseEntity.badRequest().body(Map.of("error", "请先配置 LLM Provider"));
         }
         LlmProvider provider = providerOpt.get();
+
+        // 知识库过滤（kbConfigIds 为空表示使用所有启用库，向后兼容）
+        List<Long> kbConfigIds = req.getKbConfigIds();
 
         // 创建流水线运行记录
         PipelineRun run = PipelineRun.builder()
@@ -89,7 +100,7 @@ public class PipelineController {
                 .build();
         run = pipelineRunRepository.save(run);
 
-        // 异步执行（MVP 用独立线程，后续用 CompletableFuture / 消息队列）
+        // 异步执行
         PipelineTool.LlmConfig llmConfig = PipelineTool.LlmConfig.of(
                 provider.getEndpoint(), encryptionService.decrypt(provider.getApiKeyEncrypted()), defaultModel(provider));
         Long runId = run.getId();
@@ -98,7 +109,7 @@ public class PipelineController {
         final PipelineRun finalRun = run;
         new Thread(() -> {
             try {
-                pipelineEngine.run(runId, projectId, templateId, llmConfig, "AUTO_RUN");
+                pipelineEngine.run(runId, projectId, templateId, llmConfig, "AUTO_RUN", kbConfigIds);
             } catch (Exception e) {
                 log.error("流水线执行异常", e);
                 finalRun.setStatus("FAILED");

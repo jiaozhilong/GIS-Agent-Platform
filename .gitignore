@@ -5,6 +5,7 @@ backend/.mvn/
 # Node
 frontend/node_modules/
 frontend/dist/
+backend/node_modules/
 
 # IDE
 .idea/

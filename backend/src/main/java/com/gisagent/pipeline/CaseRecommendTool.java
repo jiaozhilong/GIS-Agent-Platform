@@ -61,7 +61,7 @@ public class CaseRecommendTool implements PipelineTool {
         }
 
         String query = buildQuery(context);
-        String retrieved = retrieveFromIma(context.getUserId(), query);
+        String retrieved = retrieveFromIma(context, query);
 
         String userPrompt = """
             需求清单：
@@ -122,9 +122,9 @@ public class CaseRecommendTool implements PipelineTool {
         return String.join(", ", parts);
     }
 
-    private String retrieveFromIma(Long userId, String query) {
+    private String retrieveFromIma(ToolContext context, String query) {
         // 按当前用户隔离：使用用户自己的 IMA 凭证 + purpose=case_doc 的启用知识库
-        return imaSearchService.retrieve(userId, "case_doc", query, 5);
+        return imaSearchService.retrieve(context.getUserId(), "case_doc", query, 5, context.getKbConfigIds());
     }
 
     /** 从 LLM 返回中提取 JSON（去掉 markdown 代码块标记） */

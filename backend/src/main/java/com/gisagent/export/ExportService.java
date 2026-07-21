@@ -1,34 +1,39 @@
 package com.gisagent.export;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gisagent.pipeline.ToolContext;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.poi.xslf.usermodel.*;
-import org.apache.poi.xwpf.usermodel.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.awt.Color;
-import java.awt.Rectangle;
+import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 方案文档导出服务。
  * 支持生成 Word .docx、Markdown 与 PowerPoint .pptx 三种格式。
- * PPTX 优先使用配置的ike品牌模板（storage.pptx-template），缺失时回退默认深蓝/青色主题。
+ *
+ * Word / PPT 通过 Node.js 脚本（backend/scripts）生成：
+ *  - generate-docx.js：标书正式风格（黑体标题 + 宋体正文 + 自动目录 + 页眉页脚）
+ *  - generate-pptx.js：深蓝科技风（深蓝黑底 + 青/蓝绿主色），可选品牌模板
+ * Java 侧仅负责拼装数据、调用脚本、回收临时文件，避免 POI 文档生成的大内存占用。
  */
 @Service
 @Slf4j
 public class ExportService {
+
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     @Value("${storage.export-dir:./data/exports}")
     private String exportDir;
@@ -42,10 +47,6 @@ public class ExportService {
         // 解析为绝对路径，避免相对路径依赖 JVM 工作目录导致导出位置不可预测。
         this.exportDir = new File(exportDir).getAbsolutePath();
     }
-
-    // 品牌色：深蓝黑底 + 青/蓝绿主色
-    private static final byte[] BG = {0x0A, 0x1A, 0x2F};
-    private static final byte[] ACCENT = {0x00, (byte) 0xE5, (byte) 0xD4};
 
     public String exportMarkdown(Long projectId, String projectName, ToolContext context) {
         ensureDir();
@@ -148,346 +149,101 @@ public class ExportService {
         ensureDir();
         String fileName = String.format("%d_solution_%s.docx", projectId, timestamp());
         Path path = Path.of(exportDir, fileName);
-
-        try (XWPFDocument doc = new XWPFDocument()) {
-            // 中文字体：所有段落默认使用 SimSun（宋体）确保跨平台兼容
-            XWPFParagraph title = doc.createParagraph();
-            title.setAlignment(ParagraphAlignment.CENTER);
-            title.setPageBreak(false);
-            XWPFRun titleRun = title.createRun();
-            titleRun.setText(projectName != null ? projectName : "GIS 解决方案");
-            titleRun.setBold(true);
-            titleRun.setFontSize(20);
-            setEastAsianFont(titleRun, "SimHei"); // 黑体标题
-
-            XWPFParagraph sub = doc.createParagraph();
-            sub.setAlignment(ParagraphAlignment.CENTER);
-            XWPFRun subRun = sub.createRun();
-            subRun.setText("生成时间：" + now());
-            subRun.setFontSize(10);
-            subRun.setColor("808080");
-
-            // 分页：每个主要章节前加分页符
-            if (context.getRequirements() != null) {
-                addHeading(doc, "一、需求分析", true);
-                addSubHeading(doc, "功能需求");
-                addBullets(doc, context.getRequirements().getFunctional());
-                addSubHeading(doc, "非功能需求");
-                addBullets(doc, context.getRequirements().getNonFunctional());
-                addSubHeading(doc, "约束条件");
-                addBullets(doc, context.getRequirements().getConstraints());
-                addSubHeading(doc, "行业场景");
-                addParagraph(doc, context.getRequirements().getIndustry());
-            }
-
-            if (context.getProductSelection() != null && !context.getProductSelection().isEmpty()) {
-                addHeading(doc, "二、产品选型清单", true);
-                XWPFTable table = doc.createTable(context.getProductSelection().size() + 1, 4);
-                setCell(table.getRow(0).getCell(0), "产品名称");
-                setCell(table.getRow(0).getCell(1), "版本");
-                setCell(table.getRow(0).getCell(2), "匹配理由");
-                setCell(table.getRow(0).getCell(3), "需求覆盖率");
-                for (int i = 0; i < context.getProductSelection().size(); i++) {
-                    ToolContext.ProductSelection p = context.getProductSelection().get(i);
-                    XWPFTableRow row = table.getRow(i + 1);
-                    setCell(row.getCell(0), p.getProductName());
-                    setCell(row.getCell(1), p.getVersion());
-                    setCell(row.getCell(2), p.getReason());
-                    setCell(row.getCell(3), p.getCoverage());
-                }
-            }
-
-            if (context.getCaseRecommendations() != null && !context.getCaseRecommendations().isEmpty()) {
-                addHeading(doc, "三、参考案例", true);
-                for (ToolContext.CaseRecommendation c : context.getCaseRecommendations()) {
-                    addSubHeading(doc, c.getCaseName() + "（" + c.getScenario() + "）");
-                    addParagraph(doc, "使用产品：" + c.getProductsUsed());
-                    addParagraph(doc, "成效：" + c.getKeyEffect());
-                    addParagraph(doc, "匹配点：" + c.getMatchReason());
-                }
-            }
-
-            if (context.getCompetitorAnalysis() != null && !context.getCompetitorAnalysis().isEmpty()) {
-                addHeading(doc, "四、竞品对比", true);
-                for (ToolContext.CompetitorComparison c : context.getCompetitorAnalysis()) {
-                    addSubHeading(doc, c.getCompetitorName());
-                    addParagraph(doc, "我方优势：" + c.getOurAdvantage());
-                    addParagraph(doc, "相对劣势：" + c.getOurDisadvantage());
-                    addParagraph(doc, "应对建议：" + c.getRecommendation());
-                }
-            }
-
-            if (context.getArchitectureDiagram() != null) {
-                addHeading(doc, "五、技术架构", true);
-                addSubHeading(doc, context.getArchitectureDiagram().getTitle());
-                addParagraph(doc, context.getArchitectureDiagram().getDescription());
-                addParagraph(doc, "Mermaid 源码：\n" + context.getArchitectureDiagram().getMermaid());
-            }
-
-            if (context.getSolutionOutline() != null) {
-                addHeading(doc, "六、方案大纲", true);
-                addParagraph(doc, context.getSolutionOutline().getOverview());
-                if (context.getSolutionOutline().getSections() != null) {
-                    for (ToolContext.OutlineSection s : context.getSolutionOutline().getSections()) {
-                        addSubHeading(doc, s.getTitle());
-                        addParagraph(doc, s.getKeyPoints());
-                    }
-                }
-            }
-
-            if (context.getQualityCheck() != null) {
-                addHeading(doc, "七、方案质检", true);
-                addParagraph(doc, "整体评分：" + context.getQualityCheck().getOverallScore());
-                if (context.getQualityCheck().getDimensions() != null) {
-                    for (ToolContext.DimensionScore d : context.getQualityCheck().getDimensions()) {
-                        addParagraph(doc, d.getDimension() + "：" + d.getScore() + "（" + d.getComment() + "）");
-                    }
-                }
-                if (context.getQualityCheck().getSuggestions() != null) {
-                    addSubHeading(doc, "改进建议");
-                    addBullets(doc, context.getQualityCheck().getSuggestions());
-                }
-            }
-
-            if (context.getSolutionText() != null && !context.getSolutionText().isBlank()) {
-                addHeading(doc, "八、解决方案正文", true);
-                // 大正文智能分页：超过 3000 字符时自动插入分页符
-                String solutionText = context.getSolutionText();
-                String[] paragraphs = solutionText.split("\n");
-                for (int i = 0; i < paragraphs.length; i++) {
-                    if (i > 0 && i % 15 == 0) {
-                        // 每约 15 段插入分页，避免单页过长
-                        addParagraph(doc, ""); // spacer
-                    }
-                    addParagraph(doc, paragraphs[i]);
-                }
-            }
-
-            try (FileOutputStream out = new FileOutputStream(path.toFile())) {
-                doc.write(out);
-            }
-            log.info("DOCX 导出成功：{}", path);
-            return path.toString();
-        } catch (Exception e) {
-            log.error("DOCX 导出失败", e);
-            throw new RuntimeException("DOCX 导出失败", e);
-        }
+        Map<String, Object> data = new HashMap<>(context.toMap());
+        data.put("projectName", projectName);
+        boolean ok = runNodeScript("generate-docx.js", data, path, null);
+        if (ok) return path.toString();
+        throw new RuntimeException("DOCX 生成失败（Node 脚本执行异常，请确认 backend 已执行 npm install 且 node 可用）");
     }
 
     public String exportPptx(Long projectId, String projectName, ToolContext context) {
         ensureDir();
         String fileName = String.format("%d_solution_%s.pptx", projectId, timestamp());
         Path path = Path.of(exportDir, fileName);
-
-        XMLSlideShow ppt = loadPptxTemplate();
-        try {
-            // 封面
-            XSLFSlide cover = addSlide(ppt);
-            addTitle(cover, projectName != null ? projectName : "GIS 解决方案", 60, 260, 40, 54);
-            addText(cover, "生成时间：" + now(), 60, 330, 20, false, "B0BEC5");
-
-            if (context.getRequirements() != null) {
-                List<String> req = new ArrayList<>();
-                addIfNotNull(req, "功能需求：", context.getRequirements().getFunctional());
-                addIfNotNull(req, "非功能需求：", context.getRequirements().getNonFunctional());
-                addIfNotNull(req, "约束条件：", context.getRequirements().getConstraints());
-                if (context.getRequirements().getIndustry() != null) {
-                    req.add("行业场景：" + context.getRequirements().getIndustry());
-                }
-                addBulletSlide(ppt, "需求分析", req);
-            }
-
-            if (context.getProductSelection() != null && !context.getProductSelection().isEmpty()) {
-                List<String> prod = new ArrayList<>();
-                for (ToolContext.ProductSelection p : context.getProductSelection()) {
-                    prod.add(p.getProductName() + " " + p.getVersion() + " —— " + p.getReason());
-                }
-                addBulletSlide(ppt, "产品选型", prod);
-            }
-
-            if (context.getCaseRecommendations() != null && !context.getCaseRecommendations().isEmpty()) {
-                List<String> cases = new ArrayList<>();
-                for (ToolContext.CaseRecommendation c : context.getCaseRecommendations()) {
-                    cases.add(c.getCaseName() + "（" + c.getScenario() + "）：" + c.getKeyEffect());
-                }
-                addBulletSlide(ppt, "参考案例", cases);
-            }
-
-            if (context.getCompetitorAnalysis() != null && !context.getCompetitorAnalysis().isEmpty()) {
-                List<String> comp = new ArrayList<>();
-                for (ToolContext.CompetitorComparison c : context.getCompetitorAnalysis()) {
-                    comp.add(c.getCompetitorName() + "：优势 " + c.getOurAdvantage()
-                            + "；应对 " + c.getRecommendation());
-                }
-                addBulletSlide(ppt, "竞品对比", comp);
-            }
-
-            if (context.getArchitectureDiagram() != null) {
-                List<String> arch = new ArrayList<>();
-                arch.add(context.getArchitectureDiagram().getDescription());
-                arch.add("（架构图 Mermaid 源码详见 Word / Markdown 导出）");
-                addBulletSlide(ppt, "技术架构 · " + context.getArchitectureDiagram().getTitle(), arch);
-            }
-
-            if (context.getQualityCheck() != null) {
-                List<String> qc = new ArrayList<>();
-                qc.add("整体评分：" + context.getQualityCheck().getOverallScore());
-                if (context.getQualityCheck().getDimensions() != null) {
-                    for (ToolContext.DimensionScore d : context.getQualityCheck().getDimensions()) {
-                        qc.add(d.getDimension() + "：" + d.getScore());
-                    }
-                }
-                addBulletSlide(ppt, "方案质检", qc);
-            }
-
-            if (context.getSolutionText() != null && !context.getSolutionText().isBlank()) {
-                // 方案正文较长，截断到一页可读范围（完整版见 docx/md）
-                String text = context.getSolutionText();
-                if (text.length() > 1200) text = text.substring(0, 1200) + "\n……（完整内容见 Word / Markdown 导出）";
-                addBulletSlide(ppt, "解决方案正文（摘要）", List.of(text));
-            }
-
-            try (FileOutputStream out = new FileOutputStream(path.toFile())) {
-                ppt.write(out);
-            }
-            ppt.close();
-            log.info("PPTX 导出成功：{}", path);
-            return path.toString();
-        } catch (Exception e) {
-            log.error("PPTX 导出失败", e);
-            throw new RuntimeException("PPTX 导出失败", e);
-        }
+        Map<String, Object> data = new HashMap<>(context.toMap());
+        data.put("projectName", projectName);
+        String tpl = resolvePptxTemplate();
+        boolean ok = runNodeScript("generate-pptx.js", data, path, tpl);
+        if (ok) return path.toString();
+        throw new RuntimeException("PPTX 生成失败（Node 脚本执行异常，请确认 backend 已执行 npm install 且 node 可用）");
     }
 
-    // ---- PPTX 辅助 ----
-
-    private XMLSlideShow loadPptxTemplate() {
-        // 1. 显式配置路径
-        if (pptxTemplatePath != null && !pptxTemplatePath.isBlank()
-                && Files.exists(Path.of(pptxTemplatePath))) {
-            try {
-                XMLSlideShow tpl = new XMLSlideShow(new FileInputStream(pptxTemplatePath));
-                log.info("使用 PPT 品牌模板（配置路径）：{}", pptxTemplatePath);
-                return tpl;
-            } catch (Exception e) {
-                log.warn("加载 PPT 模板失败，尝试默认位置", e);
-            }
+    /** 解析 PPT 品牌模板：优先配置路径，其次默认目录，均无则返回 null（使用脚本内置深蓝风格）。 */
+    private String resolvePptxTemplate() {
+        if (pptxTemplatePath != null && !pptxTemplatePath.isBlank() && Files.exists(Path.of(pptxTemplatePath))) {
+            return pptxTemplatePath;
         }
-        // 2. 默认模板目录（UI 上传后存放位置）
         String defaultPath = "./data/templates/brand-template.pptx";
         if (Files.exists(Path.of(defaultPath))) {
-            try {
-                XMLSlideShow tpl = new XMLSlideShow(new FileInputStream(defaultPath));
-                log.info("使用 PPT 品牌模板（默认位置）：{}", defaultPath);
-                return tpl;
-            } catch (Exception e) {
-                log.warn("加载默认 PPT 模板失败", e);
+            return defaultPath;
+        }
+        return null;
+    }
+
+    /**
+     * 调用 backend/scripts 下的 Node 脚本生成文档。
+     * 约定：node <script> <input.json> <output> [template]
+     * 脚本成功退出码为 0 且产出文件存在。
+     */
+    private boolean runNodeScript(String scriptName, Map<String, Object> data, Path outputPath, String templatePath) {
+        try {
+            Path inputJson = Files.createTempFile("export-", ".json");
+            JSON.writeValue(inputJson.toFile(), data);
+
+            List<String> cmd = new ArrayList<>();
+            cmd.add(resolveNodeBin());
+            cmd.add(scriptDir().resolve(scriptName).toString());
+            cmd.add(inputJson.toString());
+            cmd.add(outputPath.toString());
+            if (templatePath != null) {
+                cmd.add(templatePath);
             }
-        }
-        log.info("未找到 PPT 品牌模板，使用默认深蓝/青色布局");
-        return new XMLSlideShow();
-    }
 
-    private XSLFSlide addSlide(XMLSlideShow ppt) {
-        XSLFSlide slide = ppt.createSlide();
-        slide.getBackground().setFillColor(new Color(BG[0] & 0xFF, BG[1] & 0xFF, BG[2] & 0xFF));
-        return slide;
-    }
-
-    private void addTitle(XSLFSlide slide, String text, int x, int y, int w, int size) {
-        XSLFTextBox box = slide.createTextBox();
-        box.setAnchor(new Rectangle(x, y, w, 80));
-        XSLFTextParagraph p = box.addNewTextParagraph();
-        XSLFTextRun r = p.addNewTextRun();
-        r.setText(text);
-        r.setFontColor(new Color(ACCENT[0] & 0xFF, ACCENT[1] & 0xFF, ACCENT[2] & 0xFF));
-        r.setBold(true);
-        r.setFontSize((double) size);
-    }
-
-    private void addText(XSLFSlide slide, String text, int x, int y, int size, boolean bold, String hex) {
-        XSLFTextBox box = slide.createTextBox();
-        box.setAnchor(new Rectangle(x, y, 900, 40));
-        XSLFTextParagraph p = box.addNewTextParagraph();
-        XSLFTextRun r = p.addNewTextRun();
-        r.setText(text);
-        r.setFontSize((double) size);
-        r.setBold(bold);
-        r.setFontColor(Color.decode("#" + hex));
-    }
-
-    private void addBulletSlide(XMLSlideShow ppt, String title, List<String> items) {
-        XSLFSlide slide = addSlide(ppt);
-        addTitle(slide, title, 60, 40, 900, 32);
-        XSLFTextBox box = slide.createTextBox();
-        box.setAnchor(new Rectangle(60, 110, 900, 480));
-        for (String item : items) {
-            XSLFTextParagraph p = box.addNewTextParagraph();
-            p.setBullet(true);
-            XSLFTextRun r = p.addNewTextRun();
-            r.setText(item);
-            r.setFontColor(Color.white);
-            r.setFontSize(16.0);
+            log.info("执行文档生成脚本：{}", String.join(" ", cmd));
+            ProcessBuilder pb = new ProcessBuilder(cmd);
+            pb.redirectErrorStream(true);
+            pb.directory(new File("."));
+            Process p = pb.start();
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    log.info("[node:{}] {}", scriptName, line);
+                }
+            }
+            int code = p.waitFor();
+            Files.deleteIfExists(inputJson);
+            if (code != 0) {
+                log.error("Node 脚本 {} 退出码 {}（非零）", scriptName, code);
+                return false;
+            }
+            boolean exists = Files.exists(outputPath);
+            if (!exists) {
+                log.error("Node 脚本 {} 执行成功但未找到产出文件：{}", scriptName, outputPath);
+            }
+            return exists;
+        } catch (Exception e) {
+            log.error("执行 Node 脚本失败：{}", scriptName, e);
+            return false;
         }
     }
 
-    private void addIfNotNull(List<String> target, String prefix, List<String> items) {
-        if (items == null) return;
-        for (String it : items) target.add(prefix + it);
-    }
-
-    // ---- DOCX 辅助 ----
-
-    /** 设置东亚字体（中文）确保跨平台不乱码 */
-    private void setEastAsianFont(XWPFRun run, String fontName) {
-        run.setFontFamily(fontName);
-        // POI 对东亚字体需额外设置
-        run.getCTR().addNewRPr().addNewRFonts().setEastAsia(fontName);
-    }
-
-    private void addHeading(XWPFDocument doc, String text) {
-        addHeading(doc, text, false);
-    }
-
-    private void addHeading(XWPFDocument doc, String text, boolean pageBreakBefore) {
-        XWPFParagraph p = doc.createParagraph();
-        if (pageBreakBefore) p.setPageBreak(true);
-        XWPFRun r = p.createRun();
-        r.setText(text);
-        r.setBold(true);
-        r.setFontSize(16);
-        setEastAsianFont(r, "SimHei");
-        r.addBreak();
-    }
-
-    private void addSubHeading(XWPFDocument doc, String text) {
-        XWPFParagraph p = doc.createParagraph();
-        XWPFRun r = p.createRun();
-        r.setText(text);
-        r.setBold(true);
-        r.setFontSize(13);
-        setEastAsianFont(r, "SimHei");
-    }
-
-    private void addParagraph(XWPFDocument doc, String text) {
-        XWPFParagraph p = doc.createParagraph();
-        XWPFRun r = p.createRun();
-        r.setText(text == null ? "" : text);
-        setEastAsianFont(r, "SimSun");
-    }
-
-    private void addBullets(XWPFDocument doc, List<String> items) {
-        if (items == null) return;
-        for (String item : items) {
-            XWPFParagraph p = doc.createParagraph();
-            XWPFRun r = p.createRun();
-            r.setText("• " + (item == null ? "" : item));
-            setEastAsianFont(r, "SimSun");
+    /** 解析 node 可执行文件：优先环境变量 NODE_BIN，否则走系统 PATH。 */
+    private String resolveNodeBin() {
+        String node = System.getenv("NODE_BIN");
+        if (node != null && !node.isBlank()) {
+            return node;
         }
+        return "node";
     }
 
-    private void setCell(XWPFTableCell cell, String text) {
-        cell.setText(text == null ? "" : text);
+    /** 定位脚本目录：优先 classpath 相对 ./scripts，回退到工作目录的 scripts。 */
+    private Path scriptDir() {
+        Path p = Path.of("./scripts");
+        if (Files.exists(p)) {
+            return p;
+        }
+        return Path.of(System.getProperty("user.dir"), "scripts");
     }
 
     private void appendList(StringBuilder sb, String heading, List<String> items) {

@@ -68,6 +68,19 @@ public class ImaSearchService {
      * @param topK    每个知识库取前 N 条
      */
     public String retrieve(Long userId, String purpose, String query, int topK) {
+        return retrieve(userId, purpose, query, topK, null);
+    }
+
+    /**
+     * 按用户 + 用途检索 IMA，额外支持 kbConfigIds 过滤。
+     *
+     * @param userId       当前用户
+     * @param purpose      用途过滤，null 表示不过滤
+     * @param query        查询
+     * @param topK         每个知识库取前 N 条
+     * @param kbConfigIds  指定使用的知识库配置 ID（null 表示使用所有启用库）
+     */
+    public String retrieve(Long userId, String purpose, String query, int topK, List<Long> kbConfigIds) {
         if (userId == null) {
             log.warn("[IMA] ToolContext 缺少 userId，跳过检索");
             return "（未配置 IMA 凭证）";
@@ -80,6 +93,9 @@ public class ImaSearchService {
         List<ImaKbConfig> configs = kbConfigRepository.findByUserIdAndEnabledTrue(userId);
         if (purpose != null) {
             configs = configs.stream().filter(c -> purpose.equals(c.getPurpose())).toList();
+        }
+        if (kbConfigIds != null && !kbConfigIds.isEmpty()) {
+            configs = configs.stream().filter(c -> kbConfigIds.contains(c.getId())).toList();
         }
         if (configs.isEmpty()) {
             return "（无启用的 IMA 知识库）";

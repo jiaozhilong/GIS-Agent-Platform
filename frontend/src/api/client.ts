@@ -89,11 +89,17 @@ export const imaApi = {
   kbSync: () => apiClient.post('/ima/kb-sync'),
   // 仅 mock 模式：模拟一次知识库更新（联调验证用）
   kbSimulate: () => apiClient.post('/ima/kb-simulate'),
+  // 从 IMA 远端拉取订阅/自建知识库列表
+  listRemoteKbs: () => apiClient.get('/ima/kb-list'),
 };
 
 // ===== Skills (可编排能力) API =====
 export const skillApi = {
   list: () => apiClient.get('/skills'),
+  get: (id: number) => apiClient.get(`/skills/${id}`),
+  create: (data: any) => apiClient.post('/skills', data),
+  update: (id: number, data: any) => apiClient.put(`/skills/${id}`, data),
+  remove: (id: number) => apiClient.delete(`/skills/${id}`),
 };
 
 // ===== Template (流程模板) API =====
@@ -194,8 +200,9 @@ export const projectApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
 
-  // 启动流水线
-  run: (id: number) => apiClient.post(`/projects/${id}/run`),
+  // 启动流水线（支持运行时选择模型和知识库）
+  run: (id: number, payload?: { providerId?: number; kbConfigIds?: number[] }) =>
+    apiClient.post(`/projects/${id}/run`, payload || {}),
 
   // 查询流水线状态
   status: (id: number) => apiClient.get(`/projects/${id}/status`),

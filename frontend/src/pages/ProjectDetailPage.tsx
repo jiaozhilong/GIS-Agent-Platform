@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { projectApi, toolApi, downloadBlob, searchApi } from '../api/client';
+import { projectApi, toolApi, downloadBlob, searchApi, llmApi, imaApi } from '../api/client';
 import { useToast } from '../components/ui/Toast';
 import { Modal } from '../components/ui/Modal';
 import VersionPanel from '../components/VersionPanel';
@@ -98,9 +98,41 @@ export default function ProjectDetailPage() {
   }, [projectId]);
 
   const handleRun = async () => {
-    setRunning(true);
+    // 打开运行配置弹窗（选择模型 + 知识库）
+    setRunConfigOpen(true);
+    loadRunOptions();
+  };
+
+  // ===== 运行前配置（模型 + 知识库）=====
+  const [runConfigOpen, setRunConfigOpen] = useState(false);
+  const [providers, setProviders] = useState<any[]>([]);
+  const [kbConfigs, setKbConfigs] = useState<any[]>([]);
+  const [selectedProvider, setSelectedProvider] = useState<number | ''>('');
+  const [selectedKbs, setSelectedKbs] = useState<number[]>([]);
+
+  const loadRunOptions = async () => {
     try {
-      await projectApi.run(projectId);
+      const [{ data: ps }, { data: kbs }] = await Promise.all([
+        llmApi.list(),
+        imaApi.listConfigs(),
+      ]);
+      setProviders(ps || []);
+      const enabled = (kbs || []).filter((k: any) => k.enabled);
+      setKbConfigs(enabled);
+      const def = (ps || []).find((p: any) => p.isDefault);
+      setSelectedProvider(def ? def.id : (ps && ps[0] ? ps[0].id : ''));
+      setSelectedKbs(enabled.map((k: any) => k.id));
+    } catch { /* ignore */ }
+  };
+
+  const submitRun = async () => {
+    setRunning(true);
+    setRunConfigOpen(false);
+    try {
+      await projectApi.run(projectId, {
+        providerId: selectedProvider === '' ? undefined : selectedProvider,
+        kbConfigIds: selectedKbs,
+      });
       showToast('流水线已启动，正在生成方案…');
       poll();
       if (pollRef.current) window.clearInterval(pollRef.current);
@@ -261,6 +293,57 @@ export default function ProjectDetailPage() {
           <button className="btn btn-primary btn-sm" onClick={handleRegenKb} disabled={regenKb || running}>
             {regenKb ? <IconSync width={13} height={13} className="spin" /> : <IconSync width={13} height={13} />} 用最新知识库重生成
           </button>
+        </div>
+      )}
+
+      {/* 运行前配置弹窗：模型 + 知识库 */}
+      {runConfigOpen && (
+        <div className="modal-overlay" onClick={() => setRunConfigOpen(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3 className="modal-title">运行配置</h3>
+            <div className="form-group">
+              <label>大模型</label>
+              <select
+                className="form-input"
+                value={selectedProvider}
+                onChange={(e) => setSelectedProvider(e.target.value ? Number(e.target.value) : '')}
+              >
+                {providers.length === 0 && <option value="">请先在设置页配置模型</option>}
+                {providers.map((p: any) => (
+                  <option key={p.id} value={p.id}>{p.name}（{p.model || p.endpoint}）</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>知识库（可多选，不选则使用全部启用库）</label>
+              {kbConfigs.length === 0 ? (
+                <p className="text-muted">未配置知识库，将直接基于大模型生成</p>
+              ) : (
+                <div className="checkbox-list">
+                  {kbConfigs.map((k: any) => (
+                    <label key={k.id} className="checkbox-item">
+                      <input
+                        type="checkbox"
+                        checked={selectedKbs.includes(k.id)}
+                        onChange={(e) =>
+                          setSelectedKbs(e.target.checked
+                            ? [...selectedKbs, k.id]
+                            : selectedKbs.filter((id) => id !== k.id))
+                        }
+                      />
+                      {k.kbName}（{k.purpose || '通用'}）
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="modal-actions">
+              <button className="btn btn-secondary" onClick={() => setRunConfigOpen(false)}>取消</button>
+              <button className="btn btn-primary" onClick={submitRun} disabled={running || providers.length === 0}>
+                开始生成
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

@@ -142,7 +142,7 @@ public class KbAwarenessService {
         String templateId = project.getTemplateId();
         new Thread(() -> {
             try {
-                pipelineEngine.run(runId, projectId, templateId, llmConfig, "KB_RERUN");
+                pipelineEngine.run(runId, projectId, templateId, llmConfig, "KB_RERUN", null);
             } catch (Exception e) {
                 log.error("知识库重生成执行异常", e);
             }

@@ -35,6 +35,15 @@ public class ProjectDto {
         private String status;
     }
 
+    /** 启动流水线请求体：支持运行时选择模型与知识库 */
+    @Data
+    public static class PipelineRunRequest {
+        /** 指定 LLM Provider ID（不传则使用默认 Provider） */
+        private Long providerId;
+        /** 指定使用的知识库配置 ID 列表（不传则使用所有启用库） */
+        private java.util.List<Long> kbConfigIds;
+    }
+
     @Data
     public static class ToolStatusDto {
         private Long execId;

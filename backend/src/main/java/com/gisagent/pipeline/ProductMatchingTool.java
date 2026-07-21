@@ -58,7 +58,7 @@ public class ProductMatchingTool implements PipelineTool {
 
         // 1. 从 IMA 产品知识库检索（purpose=product_doc）
         String query = buildQuery(context);
-        String retrieved = retrieveFromIma(context.getUserId(), query);
+        String retrieved = retrieveFromIma(context, query);
 
         // 2. 组装 LLM 提示词
         String userPrompt = """
@@ -120,9 +120,10 @@ public class ProductMatchingTool implements PipelineTool {
         return String.join(", ", parts);
     }
 
-    private String retrieveFromIma(Long userId, String query) {
+    private String retrieveFromIma(ToolContext context, String query) {
         // 按当前用户隔离：使用用户自己的 IMA 凭证 + purpose=product_doc 的启用知识库
-        return imaSearchService.retrieve(userId, "product_doc", query, 5);
+        // 支持运行时指定的 kbConfigIds 过滤
+        return imaSearchService.retrieve(context.getUserId(), "product_doc", query, 5, context.getKbConfigIds());
     }
 
     private String extractJson(String text) {
