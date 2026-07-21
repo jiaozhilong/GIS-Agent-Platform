@@ -147,6 +147,52 @@ public class RealIMAKnowledgeBaseConnector implements IMAKnowledgeBaseConnector 
     }
 
     @Override
+    public List<KBInfo> listKnowledgeBases(ImaAuth auth) {
+        if (auth == null || auth.clientId() == null || auth.clientId().isBlank()
+                || auth.apiKey() == null || auth.apiKey().isBlank()) {
+            log.warn("[IMA] 未配置 Client ID / API Key，跳过拉取知识库列表");
+            return Collections.emptyList();
+        }
+        try {
+            String url = resolveBaseUrl(auth) + "/list_note_book";
+            HttpEntity<Map<String, Object>> req = new HttpEntity<>(Map.of("start", 0, "end", 200), authHeaders(auth));
+            String resp = restTemplate.postForEntity(url, req, String.class).getBody();
+            return parseBookList(resp);
+        } catch (Exception e) {
+            log.warn("[IMA] 拉取知识库列表失败: {}", e.getMessage());
+            return Collections.emptyList();
+        }
+    }
+
+    private List<KBInfo> parseBookList(String resp) {
+        List<KBInfo> out = new ArrayList<>();
+        if (resp == null || resp.isBlank()) return out;
+        try {
+            JsonNode root = objectMapper.readTree(resp);
+            JsonNode data = root.path("data");
+            JsonNode list = data.path("note_book_list");
+            if (!list.isArray()) list = data.path("book_list");
+            if (!list.isArray()) list = data.path("list");
+            if (!list.isArray()) list = data.path("note_books");
+            if (!list.isArray()) return out;
+            for (JsonNode n : list) {
+                String kbId = n.path("note_book_id").asText(n.path("kb_id").asText(n.path("id").asText("")));
+                String kbName = n.path("note_book_name").asText(n.path("kb_name").asText(n.path("name").asText("")));
+                if (kbId.isBlank() && kbName.isBlank()) continue;
+                String kbType = n.path("type").asText(n.path("kb_type").asText("")).toLowerCase().contains("own") ? "owned" : "subscribed";
+                long docCount = n.path("doc_count").asLong(n.path("note_count").asLong(-1));
+                out.add(new KBInfo(
+                        kbId.isBlank() ? "ima-" + UUID.randomUUID().toString().substring(0, 8) : kbId,
+                        kbName.isBlank() ? kbId : kbName,
+                        kbType, docCount, Instant.now()));
+            }
+        } catch (Exception e) {
+            log.warn("[IMA] 解析知识库列表响应失败", e);
+        }
+        return out;
+    }
+
+    @Override
     public List<KBUpdateEvent> getUpdates(String kbId, Instant since) {
         return Collections.emptyList();
     }

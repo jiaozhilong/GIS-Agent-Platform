@@ -44,6 +44,15 @@ public interface IMAKnowledgeBaseConnector {
     KBInfo getKBInfo(String kbId);
 
     /**
+     * 拉取该用户 IMA 账号下可访问的知识库列表（订阅 + 自建）。
+     * 用于前端「从 IMA 拉取」后由用户勾选启用哪些库。
+     *
+     * @param auth 访问凭证（按用户）
+     * @return 知识库信息列表（可能为空）
+     */
+    List<KBInfo> listKnowledgeBases(ImaAuth auth);
+
+    /**
      * 获取知识库更新事件（用于自动感知更新）。
      *
      * @param kbId  知识库 ID

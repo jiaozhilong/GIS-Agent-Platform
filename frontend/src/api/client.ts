@@ -240,6 +240,15 @@ export const projectApi = {
   // 下载 PPT
   downloadPptx: (id: number) =>
     apiClient.get(`/projects/${id}/download/pptx`, { responseType: 'blob' }),
+
+  // 上传 PPT 品牌模板（全局导出样式，保存为 ./data/templates/brand-template.pptx）
+  uploadPptTemplate: (file: File) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return apiClient.post(`/projects/ppt-template`, fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
 };
 
 // ===== Tool Execution API（中间产物编辑）=====

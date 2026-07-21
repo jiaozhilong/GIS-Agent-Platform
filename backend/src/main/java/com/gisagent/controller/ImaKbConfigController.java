@@ -1,6 +1,7 @@
 package com.gisagent.controller;
 
 import com.gisagent.dto.ImaKbConfigDto;
+import com.gisagent.connector.IMAKnowledgeBaseConnector.KBInfo;
 import com.gisagent.entity.ImaKbConfig;
 import com.gisagent.repository.ImaKbConfigRepository;
 import com.gisagent.service.ImaSearchService;
@@ -35,6 +36,24 @@ public class ImaKbConfigController {
                 .collect(Collectors.toList());
         return ResponseEntity.ok(configs);
     }
+
+    /**
+     * 从 IMA 远端拉取该用户可访问的知识库列表（订阅 + 自建）。
+     * 返回 KBInfo，前端据此展示并允许用户勾选启用/停用。
+     */
+    @GetMapping("/kb-list")
+    public ResponseEntity<?> kbList(Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        List<KBInfoView> list = imaSearchService.listKnowledgeBases(userId)
+                .stream()
+                .map(k -> new KBInfoView(k.kbId(), k.kbName(), k.kbType(), k.docCount(),
+                        configRepository.findByUserIdAndKbId(userId, k.kbId()).map(ImaKbConfig::getEnabled).orElse(false)))
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(Map.of("list", list));
+    }
+
+    /** kb-list 响应视图：包含该库是否已在本地配置并启用 */
+    public record KBInfoView(String kbId, String kbName, String kbType, long docCount, boolean configured) {}
 
     @PostMapping("/configs")
     public ResponseEntity<ImaKbConfigDto.ConfigResponse> create(

@@ -75,6 +75,17 @@ public class MockIMAKnowledgeBaseConnector implements IMAKnowledgeBaseConnector 
     }
 
     @Override
+    public List<KBInfo> listKnowledgeBases(ImaAuth auth) {
+        log.info("[Mock] 列出 IMA 知识库（模拟）");
+        return List.of(
+                new KBInfo("kb-supermap-products", "超图产品智答库", "subscribed", 320, Instant.now()),
+                new KBInfo("kb-smart-city-cases", "智慧城市案例库", "subscribed", 86, Instant.now()),
+                new KBInfo("kb-gis-standards", "GIS 行业标准库", "subscribed", 54, Instant.now()),
+                new KBInfo("kb-my-collection", "我的自建笔记库", "owned", 12, Instant.now())
+        );
+    }
+
+    @Override
     public List<KBUpdateEvent> getUpdates(String kbId, Instant since) {
         log.info("[Mock] Checking updates for kbId={} since={}", kbId, since);
         // 测试/联调用：若已通过 armSimulation 装填，则返回一条 MODIFIED 事件（仅消费一次）

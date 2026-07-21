@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
-import { imaApi } from '../api/client';
+import { useEffect, useRef, useState } from 'react';
+import { imaApi, projectApi } from '../api/client';
 import { useToast } from '../components/ui/Toast';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
-import { IconPlus, IconBook, IconLink, IconClose, IconEdit } from '../components/ui/icons';
+import { IconPlus, IconBook, IconLink, IconClose, IconEdit, IconSync } from '../components/ui/icons';
 
 interface ImaConfig { id: number; kbId: string; kbName: string; kbType: string; purpose: string; searchWeight: number; enabled: boolean; }
 
@@ -103,6 +103,77 @@ export default function ImaConfigPage() {
     finally { setTesting(null); }
   };
 
+  // ===== 从 IMA 拉取知识库列表，勾选启用 =====
+  const [kbListOpen, setKbListOpen] = useState(false);
+  const [remoteKbs, setRemoteKbs] = useState<any[]>([]);
+  const [selectedKbIds, setSelectedKbIds] = useState<string[]>([]);
+  const [loadingKbList, setLoadingKbList] = useState(false);
+
+  const handleFetchKbList = async () => {
+    setLoadingKbList(true);
+    try {
+      const { data } = await imaApi.listRemoteKbs();
+      const list = (data?.list || []);
+      setRemoteKbs(list);
+      // 默认勾选已配置并启用的库
+      setSelectedKbIds(list.filter((k: any) => k.configured).map((k: any) => k.kbId));
+      setKbListOpen(true);
+    } catch (e: any) {
+      showToast(e.response?.data?.error || '拉取知识库列表失败，请先配置 IMA 凭证', true);
+    } finally {
+      setLoadingKbList(false);
+    }
+  };
+
+  const toggleRemoteKb = (kbId: string) => {
+    setSelectedKbIds((prev) => prev.includes(kbId) ? prev.filter((x) => x !== kbId) : [...prev, kbId]);
+  };
+
+  const confirmKbList = async () => {
+    try {
+      for (const kb of remoteKbs) {
+        const local = configs.find((c) => c.kbId === kb.kbId);
+        const wantEnabled = selectedKbIds.includes(kb.kbId);
+        if (local) {
+          if (local.enabled !== wantEnabled) {
+            await imaApi.updateConfig(local.id, { ...local, enabled: wantEnabled });
+          }
+        } else if (wantEnabled) {
+          await imaApi.createConfig({
+            kbId: kb.kbId, kbName: kb.kbName, kbType: kb.kbType || 'subscribed',
+            purpose: 'general', searchWeight: 0.5, enabled: true,
+          });
+        }
+      }
+      showToast('知识库启用状态已更新');
+      setKbListOpen(false);
+      fetchConfigs();
+    } catch (e: any) {
+      showToast(e.response?.data?.error || '保存失败', true);
+    }
+  };
+
+  // ===== PPT 品牌模板上传（全局导出样式）=====
+  const [pptFile, setPptFile] = useState<File | null>(null);
+  const [uploadingPpt, setUploadingPpt] = useState(false);
+  const pptInputRef = useRef<HTMLInputElement>(null);
+
+  const handlePptUpload = async () => {
+    if (!pptFile) { showToast('请先选择 .pptx 文件', true); return; }
+    setUploadingPpt(true);
+    try {
+      const { data } = await projectApi.uploadPptTemplate(pptFile);
+      showToast('PPT 品牌模板已上传，导出时将自动套用');
+      setPptFile(null);
+      if (pptInputRef.current) pptInputRef.current.value = '';
+      console.log('ppt-template uploaded', data?.path);
+    } catch (e: any) {
+      showToast(e.response?.data?.error || '上传失败', true);
+    } finally {
+      setUploadingPpt(false);
+    }
+  };
+
   return (
     <div>
       <div className="page-head">
@@ -111,6 +182,9 @@ export default function ImaConfigPage() {
           <p>连接你的 IMA 知识库，配置用途和检索权重</p>
         </div>
         <Button variant="primary" onClick={openAdd}><IconPlus /> 添加知识库</Button>
+        <Button variant="secondary" onClick={handleFetchKbList} loading={loadingKbList}>
+          <IconSync /> 从 IMA 拉取
+        </Button>
       </div>
 
       {/* 我的 IMA 凭证（按用户隔离，加密存储） */}
@@ -253,6 +327,63 @@ export default function ImaConfigPage() {
           启用该知识库
         </label>
       </Modal>
+
+      {/* 从 IMA 拉取知识库列表，勾选启用 */}
+      <Modal
+        open={kbListOpen}
+        title="从 IMA 拉取知识库"
+        onClose={() => setKbListOpen(false)}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setKbListOpen(false)}>取消</Button>
+            <Button variant="primary" onClick={confirmKbList}>保存启用状态</Button>
+          </>
+        }
+      >
+        {remoteKbs.length === 0 ? (
+          <div className="empty-state"><p>没有发现可访问的知识库，请确认 IMA 凭证已配置且有效</p></div>
+        ) : (
+          <div className="checkbox-list" style={{ maxHeight: 360, overflowY: 'auto' }}>
+            {remoteKbs.map((kb: any) => (
+              <label key={kb.kbId} className="checkbox-item" style={{ padding: '10px 0', borderBottom: '1px solid var(--border, rgba(255,255,255,0.06))' }}>
+                <input type="checkbox" checked={selectedKbIds.includes(kb.kbId)} onChange={() => toggleRemoteKb(kb.kbId)} />
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontWeight: 600 }}>{kb.kbName}</span>
+                  <span style={{ fontSize: 11, color: 'var(--muted-2)' }}>{kb.kbId} · {kb.kbType === 'owned' ? '自建' : '订阅'}{kb.docCount > 0 ? ` · ${kb.docCount} 篇` : ''}</span>
+                </div>
+              </label>
+            ))}
+          </div>
+        )}
+        <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 10, marginBottom: 0 }}>
+          勾选的库将被启用并参与方案检索；取消勾选已配置库会停用它（不删除）。
+        </p>
+      </Modal>
+
+      {/* PPT 品牌模板上传（全局导出样式） */}
+      <div className="panel" style={{ marginTop: 24 }}>
+        <div className="flex gap-3" style={{ alignItems: 'center', marginBottom: 12 }}>
+          <span className="node-icon cyan"><IconBook /></span>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 15 }}>PPT 品牌模板</div>
+            <div style={{ fontSize: 11, color: 'var(--muted-2)' }}>上传 .pptx 作为品牌模板，导出 PPT 时自动套用（保存在 data/templates/brand-template.pptx）</div>
+          </div>
+        </div>
+        <div className="flex gap-3" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
+          <input
+            ref={pptInputRef}
+            type="file"
+            accept=".pptx"
+            className="input"
+            style={{ flex: 1, minWidth: 220 }}
+            onChange={(e) => setPptFile(e.target.files && e.target.files[0] ? e.target.files[0] : null)}
+          />
+          <Button variant="primary" onClick={handlePptUpload} loading={uploadingPpt} disabled={!pptFile}>
+            <IconBook /> 上传模板
+          </Button>
+          {pptFile && <span style={{ fontSize: 12, color: 'var(--muted)' }}>{pptFile.name}</span>}
+        </div>
+      </div>
     </div>
   );
 }

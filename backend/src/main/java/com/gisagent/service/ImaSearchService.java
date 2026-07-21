@@ -2,6 +2,7 @@ package com.gisagent.service;
 
 import com.gisagent.connector.IMAKnowledgeBaseConnector;
 import com.gisagent.connector.IMAKnowledgeBaseConnector.ImaAuth;
+import com.gisagent.connector.IMAKnowledgeBaseConnector.KBInfo;
 import com.gisagent.connector.IMAKnowledgeBaseConnector.SearchOptions;
 import com.gisagent.connector.IMAKnowledgeBaseConnector.SearchResult;
 import com.gisagent.entity.ImaCredential;
@@ -119,5 +120,24 @@ public class ImaSearchService {
     /** 检索该用户全部启用的知识库（不过滤用途） */
     public String retrieveAll(Long userId, String query, int topK) {
         return retrieve(userId, null, query, topK);
+    }
+
+    /**
+     * 拉取该用户 IMA 账号下可访问的知识库列表（订阅 + 自建）。
+     * 无凭证时返回空列表（不报错），前端据此提示先配置 IMA 凭证。
+     */
+    public List<KBInfo> listKnowledgeBases(Long userId) {
+        if (userId == null) return new ArrayList<>();
+        ImaAuth auth = toAuth(credentialRepository.findByUserId(userId).orElse(null));
+        if (auth == null) {
+            log.warn("[IMA] 用户 {} 未配置 IMA 凭证，无法拉取知识库列表", userId);
+            return new ArrayList<>();
+        }
+        try {
+            return imaConnector.listKnowledgeBases(auth);
+        } catch (Exception e) {
+            log.warn("[IMA] 拉取知识库列表异常: {}", e.getMessage());
+            return new ArrayList<>();
+        }
     }
 }
