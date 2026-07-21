@@ -23,9 +23,8 @@ import java.util.UUID;
 /**
  * IMA 知识库连接器真实实现。
  * 调用 IMA 开放接口（笔记检索）作为方案生成的知识源。
- * 当 ima.mock-enabled=false 时启用，凭证通过环境变量注入（不落库）：
- *   IMA_OPENAPI_CLIENTID / IMA_OPENAPI_APIKEY
- * Base URL 默认 https://ima.qq.com/openapi/note/v1，可由 ima.openapi-base-url 覆盖。
+ * 当 ima.mock-enabled=false 时启用。凭证按用户通过 {@link ImaAuth} 传入（不落全局环境变量、不落库明文）。
+ * Base URL 默认 https://ima.qq.com/openapi/note/v1，可由 ImaAuth.baseUrl 或 ima.openapi-base-url 覆盖。
  */
 @Component
 @ConditionalOnProperty(name = "ima.mock-enabled", havingValue = "false")
@@ -38,13 +37,7 @@ public class RealIMAKnowledgeBaseConnector implements IMAKnowledgeBaseConnector 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${ima.openapi-base-url:" + DEFAULT_BASE + "}")
-    private String baseUrl;
-
-    @Value("${ima.openapi.client-id:}")
-    private String clientId;
-
-    @Value("${ima.openapi.api-key:}")
-    private String apiKey;
+    private String fallbackBaseUrl;
 
     @Value("${ima.connect-timeout-ms:8000}")
     private int connectTimeoutMs;
@@ -60,27 +53,37 @@ public class RealIMAKnowledgeBaseConnector implements IMAKnowledgeBaseConnector 
         this.restTemplate = new RestTemplate(factory);
     }
 
-    private HttpHeaders authHeaders() {
+    private String resolveBaseUrl(ImaAuth auth) {
+        if (auth.baseUrl() != null && !auth.baseUrl().isBlank()) return auth.baseUrl().trim();
+        return fallbackBaseUrl;
+    }
+
+    private HttpHeaders authHeaders(ImaAuth auth) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        if (clientId != null && !clientId.isBlank()) {
-            headers.set("ima-openapi-clientid", clientId);
+        if (auth.clientId() != null && !auth.clientId().isBlank()) {
+            headers.set("ima-openapi-clientid", auth.clientId());
         }
-        if (apiKey != null && !apiKey.isBlank()) {
-            headers.set("ima-openapi-apikey", apiKey);
+        if (auth.apiKey() != null && !auth.apiKey().isBlank()) {
+            headers.set("ima-openapi-apikey", auth.apiKey());
         }
         return headers;
     }
 
     @Override
-    public boolean testConnection(String kbId, String credential) {
+    public boolean testConnection(String kbId, ImaAuth auth) {
+        if (auth == null || auth.clientId() == null || auth.clientId().isBlank()
+                || auth.apiKey() == null || auth.apiKey().isBlank()) {
+            log.warn("[IMA] 凭证未配置，跳过连接测试");
+            return false;
+        }
         try {
-            String url = baseUrl + "/search_note_book";
+            String url = resolveBaseUrl(auth) + "/search_note_book";
             Map<String, Object> body = Map.of(
                     "search_type", 0,
                     "query_info", Map.of("title", "test"),
                     "start", 0, "end", 1);
-            HttpEntity<Map<String, Object>> req = new HttpEntity<>(body, authHeaders());
+            HttpEntity<Map<String, Object>> req = new HttpEntity<>(body, authHeaders(auth));
             restTemplate.postForEntity(url, req, String.class);
             return true;
         } catch (Exception e) {
@@ -90,18 +93,19 @@ public class RealIMAKnowledgeBaseConnector implements IMAKnowledgeBaseConnector 
     }
 
     @Override
-    public List<SearchResult> search(String kbId, String query, SearchOptions options) {
-        if (clientId == null || clientId.isBlank() || apiKey == null || apiKey.isBlank()) {
+    public List<SearchResult> search(String kbId, String query, SearchOptions options, ImaAuth auth) {
+        if (auth == null || auth.clientId() == null || auth.clientId().isBlank()
+                || auth.apiKey() == null || auth.apiKey().isBlank()) {
             log.warn("[IMA] 未配置 Client ID / API Key，跳过真实检索");
             return Collections.emptyList();
         }
         try {
-            String url = baseUrl + "/search_note_book";
+            String url = resolveBaseUrl(auth) + "/search_note_book";
             Map<String, Object> body = Map.of(
                     "search_type", 0,
                     "query_info", Map.of("title", query == null ? "" : query),
                     "start", 0, "end", Math.max(1, options.topK()));
-            HttpEntity<Map<String, Object>> req = new HttpEntity<>(body, authHeaders());
+            HttpEntity<Map<String, Object>> req = new HttpEntity<>(body, authHeaders(auth));
             String resp = restTemplate.postForEntity(url, req, String.class).getBody();
             return parseNotes(resp, kbId);
         } catch (Exception e) {

@@ -53,6 +53,10 @@ public class ToolContext {
     @JsonIgnore
     private LlmUsage usage = LlmUsage.ZERO;
 
+    /** 触发本次运行的用户 ID（用于按用户隔离 IMA 凭证与知识库检索）；不序列化 */
+    @JsonIgnore
+    private Long userId;
+
     @Data
     @NoArgsConstructor
     @AllArgsConstructor

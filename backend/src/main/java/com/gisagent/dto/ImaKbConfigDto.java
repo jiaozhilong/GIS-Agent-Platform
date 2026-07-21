@@ -47,4 +47,21 @@ public class ImaKbConfigDto {
         private Float searchWeight;
         private Boolean enabled;
     }
+
+    /** 保存/更新本用户的 IMA 凭证（clientId / apiKey 加密存储，不回显明文） */
+    @Data
+    public static class CredentialRequest {
+        private String clientId;
+        private String apiKey;
+        private String baseUrl;
+    }
+
+    /** 凭证响应：仅返回脱敏后的存在性标记与 baseUrl，绝不回显明文 */
+    @Data
+    public static class CredentialResponse {
+        private boolean configured;
+        private String clientIdMasked;
+        private String baseUrl;
+        private String message;
+    }
 }

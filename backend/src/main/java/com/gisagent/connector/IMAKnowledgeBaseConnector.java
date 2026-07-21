@@ -11,23 +11,29 @@ import java.util.Map;
 public interface IMAKnowledgeBaseConnector {
 
     /**
+     * IMA 访问凭证（按用户隔离）。实际检索/连通性测试均以此为准，连接器保持无状态。
+     */
+    record ImaAuth(String clientId, String apiKey, String baseUrl) {}
+
+    /**
      * 验证知识库连接是否正常。
      *
-     * @param kbId       知识库 ID
-     * @param credential 访问凭证
+     * @param kbId 知识库 ID（仅作结果标签）
+     * @param auth 访问凭证（按用户）
      * @return true 连接成功
      */
-    boolean testConnection(String kbId, String credential);
+    boolean testConnection(String kbId, ImaAuth auth);
 
     /**
      * 检索知识库。
      *
-     * @param kbId    知识库 ID
+     * @param kbId    知识库 ID（仅作结果标签）
      * @param query   检索查询
      * @param options 检索选项（topK、相似度阈值等）
+     * @param auth    访问凭证（按用户）
      * @return 检索结果列表
      */
-    List<SearchResult> search(String kbId, String query, SearchOptions options);
+    List<SearchResult> search(String kbId, String query, SearchOptions options, ImaAuth auth);
 
     /**
      * 获取知识库元信息。

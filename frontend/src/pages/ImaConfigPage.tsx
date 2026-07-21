@@ -25,6 +25,12 @@ export default function ImaConfigPage() {
   const { showToast } = useToast();
   const [form, setForm] = useState({ ...EMPTY });
 
+  // 我的 IMA 凭证（按用户隔离）
+  const [cred, setCred] = useState<{ configured: boolean; clientIdMasked?: string; baseUrl?: string; message?: string }>({ configured: false });
+  const [credForm, setCredForm] = useState({ clientId: '', apiKey: '', baseUrl: '' });
+  const [savingCred, setSavingCred] = useState(false);
+  const [testingCred, setTestingCred] = useState(false);
+
   const fetchConfigs = async () => {
     setLoading(true);
     try { const { data } = await imaApi.listConfigs(); setConfigs(data || []); }
@@ -32,7 +38,12 @@ export default function ImaConfigPage() {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchConfigs(); }, [showToast]);
+  const fetchCredential = async () => {
+    try { const { data } = await imaApi.getCredential(); setCred(data || { configured: false }); }
+    catch (e: any) { /* 非致命 */ setCred({ configured: false }); }
+  };
+
+  useEffect(() => { fetchConfigs(); fetchCredential(); }, [showToast]);
 
   const openAdd = () => { setEditingId(null); setForm({ ...EMPTY }); setModalOpen(true); };
   const openEdit = (c: ImaConfig) => {
@@ -50,6 +61,29 @@ export default function ImaConfigPage() {
       setModalOpen(false);
       fetchConfigs();
     } catch (e: any) { showToast(e.response?.data?.error || '保存失败', true); }
+  };
+
+  const handleSaveCred = async () => {
+    if (!credForm.clientId.trim() || !credForm.apiKey.trim()) { showToast('请填写 Client ID 与 API Key', true); return; }
+    setSavingCred(true);
+    try {
+      const { data } = await imaApi.saveCredential(credForm);
+      setCred(data); setCredForm({ clientId: '', apiKey: '', baseUrl: data.baseUrl || '' });
+      showToast('IMA 凭证已保存（加密存储）');
+    } catch (e: any) { showToast(e.response?.data?.error || '保存失败', true); }
+    finally { setSavingCred(false); }
+  };
+
+  const handleDeleteCred = async () => {
+    try { await imaApi.deleteCredential(); setCred({ configured: false }); showToast('已清除 IMA 凭证'); }
+    catch (e: any) { showToast(e.response?.data?.error || '清除失败', true); }
+  };
+
+  const handleTestCred = async () => {
+    setTestingCred(true);
+    try { const { data } = await imaApi.testCredential(); showToast(data?.message || (data?.success ? '连接成功' : '连接失败')); }
+    catch (e: any) { showToast(e.response?.data?.error || '测试失败', true); }
+    finally { setTestingCred(false); }
   };
 
   const handleDelete = async (id: number) => {
@@ -77,6 +111,45 @@ export default function ImaConfigPage() {
           <p>连接你的 IMA 知识库，配置用途和检索权重</p>
         </div>
         <Button variant="primary" onClick={openAdd}><IconPlus /> 添加知识库</Button>
+      </div>
+
+      {/* 我的 IMA 凭证（按用户隔离，加密存储） */}
+      <div className="panel" style={{ marginBottom: 24 }}>
+        <div className="flex-between" style={{ marginBottom: 14 }}>
+          <div className="flex gap-3" style={{ alignItems: 'center' }}>
+            <span className="node-icon purple"><IconBook /></span>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 15 }}>我的 IMA 凭证</div>
+              <div style={{ fontSize: 11, color: 'var(--muted-2)' }}>每个用户独立配置，仅本人可用，密钥加密存储</div>
+            </div>
+          </div>
+          {cred.configured
+            ? <span className="badge badge-mint">已配置{cred.clientIdMasked ? ` · ${cred.clientIdMasked}` : ''}</span>
+            : <span className="badge badge-idle">未配置</span>}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14, marginBottom: 14 }}>
+          <div className="field" style={{ margin: 0 }}>
+            <label className="label">Client ID</label>
+            <input className="input" placeholder="IMA 开放平台获取的 Client ID" value={credForm.clientId}
+              onChange={(e) => setCredForm({ ...credForm, clientId: e.target.value })} />
+          </div>
+          <div className="field" style={{ margin: 0 }}>
+            <label className="label">API Key</label>
+            <input className="input" type="password" placeholder="IMA 开放平台获取的 API Key" value={credForm.apiKey}
+              onChange={(e) => setCredForm({ ...credForm, apiKey: e.target.value })} />
+          </div>
+          <div className="field" style={{ margin: 0 }}>
+            <label className="label">Base URL（可选）</label>
+            <input className="input" placeholder="默认 https://ima.qq.com/openapi/note/v1" value={credForm.baseUrl}
+              onChange={(e) => setCredForm({ ...credForm, baseUrl: e.target.value })} />
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="secondary" size="sm" onClick={handleSaveCred} loading={savingCred}><IconLink /> 保存凭证</Button>
+          <Button variant="secondary" size="sm" onClick={handleTestCred} loading={testingCred}>测试连接</Button>
+          {cred.configured && <Button variant="danger" size="sm" onClick={handleDeleteCred}>清除</Button>}
+        </div>
+        {cred.message && <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 10, marginBottom: 0 }}>{cred.message}</p>}
       </div>
 
       {loading ? (

@@ -80,6 +80,11 @@ export const imaApi = {
   updateConfig: (id: number, data: any) => apiClient.put(`/ima/configs/${id}`, data),
   deleteConfig: (id: number) => apiClient.delete(`/ima/configs/${id}`),
   testConfig: (id: number) => apiClient.post(`/ima/configs/${id}/test`),
+  // 我的 IMA 凭证（按用户隔离，加密存储）
+  getCredential: () => apiClient.get('/ima/credentials'),
+  saveCredential: (data: any) => apiClient.put('/ima/credentials', data),
+  deleteCredential: () => apiClient.delete('/ima/credentials'),
+  testCredential: () => apiClient.post('/ima/credentials/test'),
   // 手动触发知识库同步（P3-1）
   kbSync: () => apiClient.post('/ima/kb-sync'),
   // 仅 mock 模式：模拟一次知识库更新（联调验证用）

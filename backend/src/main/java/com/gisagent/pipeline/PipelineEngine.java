@@ -46,6 +46,7 @@ public class PipelineEngine {
     private final com.gisagent.service.ProjectVersionService versionService;
     private final EmbeddingService embeddingService;
     private final BillingService billingService;
+    private final ProjectRepository projectRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /** toolType → 实际工具实例，用于按模板工具链解析 */
@@ -88,7 +89,8 @@ public class PipelineEngine {
                           PipelineTemplateRepository templateRepository,
                           com.gisagent.service.ProjectVersionService versionService,
                           EmbeddingService embeddingService,
-                          BillingService billingService) {
+                          BillingService billingService,
+                          ProjectRepository projectRepository) {
         this.requirementAnalysisTool = requirementAnalysisTool;
         this.productMatchingTool = productMatchingTool;
         this.caseRecommendTool = caseRecommendTool;
@@ -105,6 +107,7 @@ public class PipelineEngine {
         this.versionService = versionService;
         this.embeddingService = embeddingService;
         this.billingService = billingService;
+        this.projectRepository = projectRepository;
 
         TOOL_BY_TYPE.put("REQUIREMENT_ANALYSIS", requirementAnalysisTool);
         TOOL_BY_TYPE.put("PRODUCT_MATCHING", productMatchingTool);
@@ -142,6 +145,8 @@ public class PipelineEngine {
 
         ToolContext context = ToolContext.empty();
         context.setRequirementDoc(loadRequirementDoc(projectId));
+        // 按用户隔离 IMA：把触发用户 ID 写入上下文（供工具链检索该用户自己的知识库）
+        projectRepository.findById(projectId).ifPresent(p -> context.setUserId(p.getUserId()));
 
         // 构建 toolType → 执行记录 映射
         Map<String, ToolExecution> execMap = new LinkedHashMap<>();
@@ -379,6 +384,8 @@ public class PipelineEngine {
 
         ToolContext parsed = parseContext(run.getContextJson());
         final ToolContext ctx = parsed != null ? parsed : ToolContext.empty();
+        // 按用户隔离 IMA：rerun 上下文来自 JSON（不含 userId），需从 project 补回
+        projectRepository.findById(projectId).ifPresent(p -> ctx.setUserId(p.getUserId()));
 
         // 回注被编辑节点的产物
         toolExecutionRepository.findByPipelineRunIdAndToolOrder(pipelineRunId, fromOrder)

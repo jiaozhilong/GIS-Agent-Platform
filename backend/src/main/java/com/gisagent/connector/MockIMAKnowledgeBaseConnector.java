@@ -27,13 +27,13 @@ public class MockIMAKnowledgeBaseConnector implements IMAKnowledgeBaseConnector 
     private static final Logger log = LoggerFactory.getLogger(MockIMAKnowledgeBaseConnector.class);
 
     @Override
-    public boolean testConnection(String kbId, String credential) {
+    public boolean testConnection(String kbId, ImaAuth auth) {
         log.info("[Mock] Testing IMA connection for kbId={}", kbId);
         return true;
     }
 
     @Override
-    public List<SearchResult> search(String kbId, String query, SearchOptions options) {
+    public List<SearchResult> search(String kbId, String query, SearchOptions options, ImaAuth auth) {
         log.info("[Mock] Searching kbId={}, query={}, topK={}, minScore={}, purpose={}",
                 kbId, query, options.topK(), options.minScore(), options.purpose());
         // 返回多条模拟结果

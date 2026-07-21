@@ -1,9 +1,9 @@
 package com.gisagent.controller;
 
-import com.gisagent.connector.IMAKnowledgeBaseConnector;
 import com.gisagent.dto.ImaKbConfigDto;
 import com.gisagent.entity.ImaKbConfig;
 import com.gisagent.repository.ImaKbConfigRepository;
+import com.gisagent.service.ImaSearchService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -18,12 +18,12 @@ import java.util.stream.Collectors;
 public class ImaKbConfigController {
 
     private final ImaKbConfigRepository configRepository;
-    private final IMAKnowledgeBaseConnector imaConnector;
+    private final ImaSearchService imaSearchService;
 
     public ImaKbConfigController(ImaKbConfigRepository configRepository,
-                                  IMAKnowledgeBaseConnector imaConnector) {
+                                  ImaSearchService imaSearchService) {
         this.configRepository = configRepository;
-        this.imaConnector = imaConnector;
+        this.imaSearchService = imaSearchService;
     }
 
     @GetMapping("/configs")
@@ -97,10 +97,10 @@ public class ImaKbConfigController {
         return configRepository.findById(id)
                 .filter(c -> c.getUserId().equals(userId))
                 .map(c -> {
-                    boolean connected = imaConnector.testConnection(c.getKbId(), "");
+                    boolean connected = imaSearchService.testConnection(userId, c.getKbId());
                     ImaKbConfigDto.TestResponse response = new ImaKbConfigDto.TestResponse();
                     response.setSuccess(connected);
-                    response.setMessage(connected ? "连接成功" : "连接失败");
+                    response.setMessage(connected ? "连接成功" : (c.getKbId() != null ? "连接失败：请检查本用户的 IMA 凭证" : "连接失败"));
                     return ResponseEntity.ok(response);
                 })
                 .orElse(ResponseEntity.notFound().build());

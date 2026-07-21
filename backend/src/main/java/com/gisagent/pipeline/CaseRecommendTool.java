@@ -2,7 +2,7 @@ package com.gisagent.pipeline;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.gisagent.connector.IMAKnowledgeBaseConnector;
+import com.gisagent.service.ImaSearchService;
 import com.gisagent.service.LlmService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -19,7 +19,7 @@ import java.util.List;
 public class CaseRecommendTool implements PipelineTool {
 
     private final LlmService llmService;
-    private final IMAKnowledgeBaseConnector imaConnector;
+    private final ImaSearchService imaSearchService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private static final String SYSTEM_PROMPT = """
@@ -43,9 +43,9 @@ public class CaseRecommendTool implements PipelineTool {
         说明：matchScore 为该案例与当前需求的相关度（0-100，越高越相关）；referenceDoc 必须取自下方"知识库检索到的案例资料"中的某条标题。
         """;
 
-    public CaseRecommendTool(LlmService llmService, IMAKnowledgeBaseConnector imaConnector) {
+    public CaseRecommendTool(LlmService llmService, ImaSearchService imaSearchService) {
         this.llmService = llmService;
-        this.imaConnector = imaConnector;
+        this.imaSearchService = imaSearchService;
     }
 
     @Override
@@ -61,7 +61,7 @@ public class CaseRecommendTool implements PipelineTool {
         }
 
         String query = buildQuery(context);
-        String retrieved = retrieveFromIma(query);
+        String retrieved = retrieveFromIma(context.getUserId(), query);
 
         String userPrompt = """
             需求清单：
@@ -122,19 +122,9 @@ public class CaseRecommendTool implements PipelineTool {
         return String.join(", ", parts);
     }
 
-    private String retrieveFromIma(String query) {
-        try {
-            var results = imaConnector.search("kb-case-doc", query,
-                    new IMAKnowledgeBaseConnector.SearchOptions(5, 0.5, "case_doc"));
-            StringBuilder sb = new StringBuilder();
-            for (var r : results) {
-                sb.append("- ").append(r.title()).append(": ").append(r.content()).append("\n");
-            }
-            return sb.toString().isBlank() ? "（无检索结果）" : sb.toString();
-        } catch (Exception e) {
-            log.warn("IMA 案例检索失败，使用空检索结果", e);
-            return "（检索失败）";
-        }
+    private String retrieveFromIma(Long userId, String query) {
+        // 按当前用户隔离：使用用户自己的 IMA 凭证 + purpose=case_doc 的启用知识库
+        return imaSearchService.retrieve(userId, "case_doc", query, 5);
     }
 
     /** 从 LLM 返回中提取 JSON（去掉 markdown 代码块标记） */

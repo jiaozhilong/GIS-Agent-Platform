@@ -2,7 +2,7 @@ package com.gisagent.pipeline;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.gisagent.connector.IMAKnowledgeBaseConnector;
+import com.gisagent.service.ImaSearchService;
 import com.gisagent.service.LlmService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -19,7 +19,7 @@ import java.util.List;
 public class ProductMatchingTool implements PipelineTool {
 
     private final LlmService llmService;
-    private final IMAKnowledgeBaseConnector imaConnector;
+    private final ImaSearchService imaSearchService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private static final String SYSTEM_PROMPT = """
@@ -39,9 +39,9 @@ public class ProductMatchingTool implements PipelineTool {
         }
         """;
 
-    public ProductMatchingTool(LlmService llmService, IMAKnowledgeBaseConnector imaConnector) {
+    public ProductMatchingTool(LlmService llmService, ImaSearchService imaSearchService) {
         this.llmService = llmService;
-        this.imaConnector = imaConnector;
+        this.imaSearchService = imaSearchService;
     }
 
     @Override
@@ -58,7 +58,7 @@ public class ProductMatchingTool implements PipelineTool {
 
         // 1. 从 IMA 产品知识库检索（purpose=product_doc）
         String query = buildQuery(context);
-        String retrieved = retrieveFromIma(query);
+        String retrieved = retrieveFromIma(context.getUserId(), query);
 
         // 2. 组装 LLM 提示词
         String userPrompt = """
@@ -120,21 +120,9 @@ public class ProductMatchingTool implements PipelineTool {
         return String.join(", ", parts);
     }
 
-    private String retrieveFromIma(String query) {
-        try {
-            // MVP：对所有已连接知识库检索 purpose=product_doc 的内容
-            // 实际实现中需按用户配置的 KB 路由，这里用 Mock 返回
-            var results = imaConnector.search("kb-product-doc", query,
-                    new IMAKnowledgeBaseConnector.SearchOptions(5, 0.5, "product_doc"));
-            StringBuilder sb = new StringBuilder();
-            for (var r : results) {
-                sb.append("- ").append(r.title()).append(": ").append(r.content()).append("\n");
-            }
-            return sb.toString().isBlank() ? "（无检索结果）" : sb.toString();
-        } catch (Exception e) {
-            log.warn("IMA 检索失败，使用空检索结果", e);
-            return "（检索失败）";
-        }
+    private String retrieveFromIma(Long userId, String query) {
+        // 按当前用户隔离：使用用户自己的 IMA 凭证 + purpose=product_doc 的启用知识库
+        return imaSearchService.retrieve(userId, "product_doc", query, 5);
     }
 
     private String extractJson(String text) {
