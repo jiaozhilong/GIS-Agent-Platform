@@ -23,11 +23,11 @@ import java.util.UUID;
 /**
  * IMA 知识库连接器真实实现（Wiki API v1）。
  * 调用 IMA 开放接口（知识库搜索/检索/列表）作为方案生成的知识源。
- * 当 ima.mock-enabled=false 时启用。凭证按用户通过 {@link ImaAuth} 传入。
+ * 默认启用，凭证按用户通过 {@link ImaAuth} 传入。
  * Base URL 默认 https://ima.qq.com/openapi/wiki/v1。
+ * 设置 ima.mock-enabled=true 可切换为 Mock 实现。
  */
 @Component
-@ConditionalOnProperty(name = "ima.mock-enabled", havingValue = "false")
 public class RealIMAKnowledgeBaseConnector implements IMAKnowledgeBaseConnector {
 
     private static final Logger log = LoggerFactory.getLogger(RealIMAKnowledgeBaseConnector.class);

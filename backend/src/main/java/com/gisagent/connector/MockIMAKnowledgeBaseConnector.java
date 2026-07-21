@@ -15,10 +15,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * IMA 知识库连接器的 Mock 实现。
  * 用于 Phase 1 MVP 开发阶段，模拟 IMA MCP 接口行为。
- * 当 ima.mock-enabled=true 时启用（默认）。
+ * 仅在 ima.mock-enabled=true 时启用（默认不启用）。
+ * 默认使用 RealIMAKnowledgeBaseConnector 连接真实 IMA API。
  */
-@Component
-@ConditionalOnProperty(name = "ima.mock-enabled", havingValue = "true", matchIfMissing = true)
+// @Component — 默认禁用，需要时取消注释并设置 ima.mock-enabled=true
+// @ConditionalOnProperty(name = "ima.mock-enabled", havingValue = "true")
 public class MockIMAKnowledgeBaseConnector implements IMAKnowledgeBaseConnector {
 
     /** 模拟更新事件开关（仅测试/联调用，消费一次即复位） */
