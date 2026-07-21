@@ -125,10 +125,13 @@ public class LlmService {
     }
 
     /**
-     * 连通性测试：发送最小 chat 请求，校验模型是否返回非空内容。
+     * 连通性测试：发送最小 chat 请求，校验端点/凭证/model 是否有效。
      * 用于 Provider 配置页的「连接测试」按钮，替代恒真占位逻辑。
+     * 判定标准：HTTP 2xx 且响应含非空 choices 数组。
+     * 注意推理模型(如 deepseek-v4-pro / reasoner)可能 content 为空、答案在 reasoning_content，
+     * 因此以 choices 是否存在为准，而非 content 是否非空。
      *
-     * @return 连通成功且模型返回内容则为 true
+     * @return 端点/凭证/model 有效则为 true
      */
     public boolean testConnect(String endpoint, String apiKey, String model) {
         String url = ensureChatCompletionsUrl(endpoint);
@@ -153,10 +156,29 @@ public class LlmService {
                 log.warn("LLM 连通性测试返回非 2xx: {}", response.getStatusCode());
                 return false;
             }
-            String content = extractContent(response.getBody());
-            return content != null && !content.isBlank();
+            // 2xx 且响应含合法 choices 即视为凭证/端点有效。
+            // 推理模型(如 deepseek-v4-pro / reasoner)可能 content 为空、答案落在 reasoning_content，
+            // 因此不能用 content 是否非空来判断连通性。
+            boolean ok = responseHasChoices(response.getBody());
+            if (!ok) {
+                log.warn("LLM 连通性测试：响应缺少有效的 choices 数组（凭证/端点/model 可能无效）");
+            }
+            return ok;
         } catch (Exception e) {
             log.warn("LLM 连通性测试失败: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    /** 判断响应是否为合法的 chat.completion（含非空 choices 数组）。 */
+    private boolean responseHasChoices(String body) {
+        if (body == null || body.isBlank()) return false;
+        try {
+            JsonNode root = objectMapper.readTree(body);
+            JsonNode choices = root.path("choices");
+            return choices.isArray() && choices.size() > 0;
+        } catch (Exception e) {
+            log.warn("解析 LLM 测试响应失败", e);
             return false;
         }
     }
