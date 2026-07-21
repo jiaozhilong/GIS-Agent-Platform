@@ -8,7 +8,8 @@
   display: grid;
   grid-template-columns: 1fr 520px;
   width: 100%;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .brand-side {
@@ -17,7 +18,7 @@
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  overflow: hidden;
+  overflow-y: auto;
   background:
     radial-gradient(circle at 55% 40%, rgba(55, 211, 157, 0.10), transparent 50%),
     radial-gradient(circle at 30% 60%, rgba(68, 181, 189, 0.06), transparent 45%),
@@ -143,6 +144,7 @@
   background: linear-gradient(180deg, rgba(10, 21, 19, 0.92), rgba(7, 16, 15, 0.96));
   border-left: 1px solid var(--line);
   backdrop-filter: blur(20px);
+  overflow-y: auto;
 }
 .form-header { margin-bottom: 32px; }
 .form-header h1 { font-size: 28px; font-weight: 760; letter-spacing: -.03em; margin-bottom: 8px; }
@@ -266,7 +268,7 @@
 /* ========== 流程编排页 ========== */
 .pipeline-layout { display: grid; grid-template-columns: 220px 1fr 340px; min-height: calc(100vh - 64px); }
 .pipeline-toolbox { border-right: 1px solid var(--line); background: rgba(7, 16, 15, .6); padding: 16px 12px; overflow-y: auto; }
-.pipeline-shell { display: grid; grid-template-columns: var(--sidebar-w) 1fr 360px; min-height: calc(100vh - 0px); }
+.pipeline-shell { display: grid; grid-template-columns: var(--sidebar-w) 1fr 360px; height: 100vh; overflow: hidden; }
 .pipeline-shell .sidebar { position: static; height: auto; }
 .toolbox { flex: 1; overflow-y: auto; }
 .toolbox-section { margin-bottom: 20px; }
@@ -275,9 +277,9 @@
 .tool-node:hover { border-color: var(--line-strong); background: rgba(255, 255, 255, .04); }
 .tool-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
 .tool-dot.mint { background: var(--mint); } .tool-dot.cyan { background: var(--cyan); } .tool-dot.amber { background: var(--amber); } .tool-dot.purple { background: var(--purple); }
-.canvas-area { position: relative; overflow: hidden; background: radial-gradient(circle at 50% 50%, rgba(55, 211, 157, 0.06), transparent 60%); min-height: calc(100vh - 0px); }
+.canvas-area { position: relative; overflow: hidden; background: radial-gradient(circle at 50% 50%, rgba(55, 211, 157, 0.06), transparent 60%); height: 100vh; }
 .canvas-grid { position: absolute; inset: 0; opacity: .20; background-image: linear-gradient(rgba(179, 227, 212, .04) 1px, transparent 1px), linear-gradient(90deg, rgba(179, 227, 212, .04) 1px, transparent 1px); background-size: 32px 32px; }
-.canvas-content { position: relative; z-index: 2; width: 100%; height: 100%; min-height: calc(100vh - 0px); display: grid; place-items: center; }
+.canvas-content { position: relative; z-index: 2; width: 100%; height: 100%; display: grid; place-items: center; }
 .flow-diagram { position: relative; width: 720px; height: 520px; max-width: 90%; }
 .pipe-node { position: absolute; width: 160px; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); backdrop-filter: blur(8px); transition: .22s ease; cursor: pointer; }
 .pipe-node:hover { border-color: var(--line-strong); transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0, 0, 0, .25); }

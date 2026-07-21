@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -31,6 +32,7 @@ public class AdminUserController {
 
     private final UserRepository userRepository;
     private final OrganizationRepository organizationRepository;
+    private final PasswordEncoder passwordEncoder;
 
     private Long requireSuperAdmin(Authentication auth) {
         if (auth == null || !(auth.getPrincipal() instanceof Long)) {
@@ -92,6 +94,43 @@ public class AdminUserController {
         target.setEnabled(!Boolean.TRUE.equals(target.getEnabled()));
         userRepository.save(target);
         return ResponseEntity.ok(Map.of("ok", true, "enabled", target.getEnabled()));
+    }
+
+    /** 管理员创建/邀请新用户（指定用户名、初始密码、角色），注册后用户可自行修改密码 */
+    @PostMapping("/users")
+    public ResponseEntity<?> createUser(@RequestBody Map<String, Object> body, Authentication auth) {
+        requireSuperAdmin(auth);
+        String username = (String) body.get("username");
+        String password = (String) body.get("password");
+        String displayName = (String) body.getOrDefault("displayName", null);
+        String email = (String) body.getOrDefault("email", null);
+        String role = (String) body.getOrDefault("role", "USER");
+        if (username == null || username.isBlank() || password == null || password.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "用户名和密码不能为空"));
+        }
+        if (!List.of("SUPER_ADMIN", "ADMIN", "USER").contains(role)) {
+            return ResponseEntity.badRequest().body(Map.of("error", "非法角色"));
+        }
+        if (userRepository.existsByUsername(username.trim())) {
+            return ResponseEntity.badRequest().body(Map.of("error", "用户名已存在"));
+        }
+        Long orgId = organizationRepository.findByName("默认组织")
+                .map(Organization::getId)
+                .orElseGet(() -> organizationRepository.save(
+                        Organization.builder().name("默认组织").slug("default").build()).getId());
+        User user = User.builder()
+                .username(username.trim())
+                .password(passwordEncoder.encode(password))
+                .role(role)
+                .enabled(true)
+                .displayName(displayName != null ? displayName : null)
+                .email(email != null ? email : null)
+                .organizationId(orgId)
+                .build();
+        user = userRepository.save(user);
+        return ResponseEntity.ok(Map.of(
+                "id", user.getId(), "username", user.getUsername(),
+                "displayName", user.getDisplayName(), "role", user.getRole()));
     }
 
     // ===== 组织（租户）管理（P7-1，仅 SUPER_ADMIN）=====

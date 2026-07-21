@@ -25,6 +25,12 @@ const TOOL_LABELS: Record<string, string> = {
   SOLUTION_QC: '方案质检', SOLUTION_OUTPUT: '方案输出',
 };
 
+const TOOL_COLORS: Record<string, string> = {
+  REQUIREMENT_ANALYSIS: 'mint', PRODUCT_MATCHING: 'cyan', CASE_RECOMMEND: 'amber',
+  COMPETITIVE_ANALYSIS: 'amber', ARCHITECTURE_DIAGRAM: 'purple', SOLUTION_OUTLINE: 'cyan',
+  SOLUTION_QC: 'amber', SOLUTION_OUTPUT: 'mint',
+};
+
 const EMPTY = {
   name: '', description: '', type: 'API_ENDPOINT', toolType: 'REQUIREMENT_ANALYSIS',
   endpointUrl: '', apiKey: '', requestTemplate: '', gitRepoUrl: '', gitRef: '', enabled: true,
@@ -93,8 +99,8 @@ export default function SkillsPage() {
     <div>
       <div className="page-head">
         <div>
-          <h1>技能中心（Skills）</h1>
-          <p>为每个流水线工具节点绑定外部能力（如社区 ppt-master、自建 API），运行时按配置替代内置逻辑</p>
+          <h1>技能中心</h1>
+          <p>为每个流水线工具节点绑定外部能力（API 端点 / Git 仓库），运行时按配置替代内置逻辑</p>
         </div>
         <Button variant="primary" onClick={openAdd}><IconPlus /> 添加 Skill</Button>
       </div>
@@ -105,45 +111,80 @@ export default function SkillsPage() {
         <div className="panel"><div className="empty-state">
           <IconBook />
           <h3>尚未配置 Skill</h3>
-          <p>添加一个 API_ENDPOINT 或 GIT_REPO 类型的外部能力，并绑定到工具节点（如需求分析 / 架构图）</p>
+          <p>点击「添加 Skill」为需求分析、产品选型、PPT 输出等工具节点绑定外部技能服务</p>
         </div></div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 20 }}>
-          {skills.map((s) => (
-            <div className="card" key={s.id} style={{ padding: 20 }}>
-              <div className="flex-between" style={{ marginBottom: 12 }}>
-                <div className="flex gap-3" style={{ alignItems: 'center' }}>
-                  <span className="node-icon cyan"><IconBook /></span>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: 15 }}>{s.name}</div>
-                    <div style={{ fontSize: 11, color: 'var(--muted-2)' }}>{s.description || '—'}</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gap: 20 }}>
+          {skills.map((s) => {
+            const toolLabel = TOOL_LABELS[s.toolType] || s.toolType;
+            const colorKey = TOOL_COLORS[s.toolType] || 'cyan';
+            return (
+              <div className="card" key={s.id} style={{ padding: 0, overflow: 'hidden' }}>
+                {/* 卡片头部：名称 + 状态 */}
+                <div style={{
+                  padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+                  borderBottom: '1px solid var(--border-color, rgba(255,255,255,0.05))',
+                }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>{s.name}</div>
+                    {s.description && (
+                      <div style={{ fontSize: 12, color: 'var(--muted-2)', lineHeight: 1.5 }}>{s.description}</div>
+                    )}
+                  </div>
+                  <span className={`badge ${s.enabled ? 'badge-mint' : 'badge-idle'}`} style={{ flexShrink: 0, marginLeft: 12 }}>
+                    {s.enabled ? '已启用' : '已禁用'}
+                  </span>
+                </div>
+
+                {/* 字段区 */}
+                <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span className={`badge badge-${colorKey}`} style={{ fontSize: 11 }}>{toolLabel}</span>
+                    <span className={`badge ${s.type === 'API_ENDPOINT' ? 'badge-cyan' : 'badge-purple'}`} style={{ fontSize: 11 }}>
+                      {s.type === 'API_ENDPOINT' ? 'API 端点' : 'Git 仓库'}
+                    </span>
+                  </div>
+
+                  {/* 配置摘要 */}
+                  <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.8 }}>
+                    {s.type === 'API_ENDPOINT' ? (
+                      <>
+                        <div>端点：<code style={{ fontSize: 11, wordBreak: 'break-all' }}>{s.endpointUrl || '—'}</code></div>
+                        <div>密钥：{s.hasApiKey ? '✅ 已配置' : '⚠️ 未配置'}</div>
+                        {s.requestTemplate && <div>模板：<code style={{ fontSize: 10 }}>{s.requestTemplate.slice(0, 60)}{s.requestTemplate.length > 60 ? '…' : ''}</code></div>}
+                      </>
+                    ) : (
+                      <>
+                        <div>仓库：<code style={{ fontSize: 11, wordBreak: 'break-all' }}>{s.gitRepoUrl || '—'}</code></div>
+                        <div>分支：<code style={{ fontSize: 11 }}>{s.gitRef || 'main（默认）'}</code></div>
+                      </>
+                    )}
                   </div>
                 </div>
-                <span className={`badge ${s.type === 'API_ENDPOINT' ? 'badge-cyan' : 'badge-purple'}`}>
-                  {s.type === 'API_ENDPOINT' ? 'API' : 'GIT'}
-                </span>
-              </div>
 
-              <div className="flex gap-2" style={{ marginBottom: 14 }}>
-                <span className="badge badge-mint">{TOOL_LABELS[s.toolType] || s.toolType}</span>
-                <span className={`badge ${s.enabled ? 'badge-mint' : 'badge-idle'}`}>{s.enabled ? '已启用' : '已禁用'}</span>
+                {/* 操作区 */}
+                <div style={{
+                  padding: '12px 20px', display: 'flex', gap: 8,
+                  borderTop: '1px solid var(--border-color, rgba(255,255,255,0.05))',
+                  background: 'rgba(255,255,255,0.01)',
+                }}>
+                  <Button variant="secondary" size="sm" onClick={() => handleTest(s.id)} loading={testing === s.id}>
+                    <IconSync /> 测试
+                  </Button>
+                  <Button variant="secondary" size="sm" onClick={() => handleToggle(s)}>
+                    {s.enabled ? '禁用' : '启用'}
+                  </Button>
+                  <Button variant="secondary" size="sm" onClick={() => openEdit(s)}>
+                    <IconEdit /> 编辑
+                  </Button>
+                  <div style={{ flex: 1 }} />
+                  <Button variant="danger" size="sm" onClick={() => handleDelete(s.id)}>
+                    <IconClose />
+                  </Button>
+                </div>
               </div>
-
-              <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 14, wordBreak: 'break-all' }}>
-                {s.type === 'API_ENDPOINT'
-                  ? (s.endpointUrl || '未配置端点')
-                  : (s.gitRepoUrl || '未配置仓库')}
-                {s.hasApiKey ? ' · 已配置密钥' : ''}
-              </div>
-
-              <div className="flex gap-2">
-                <Button variant="secondary" size="sm" onClick={() => handleTest(s.id)} loading={testing === s.id}><IconSync /> 测试</Button>
-                <Button variant="secondary" size="sm" onClick={() => handleToggle(s)}>{s.enabled ? '禁用' : '启用'}</Button>
-                <Button variant="secondary" size="sm" onClick={() => openEdit(s)}><IconEdit /> 编辑</Button>
-                <Button variant="danger" size="sm" onClick={() => handleDelete(s.id)}><IconClose /></Button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -164,15 +205,15 @@ export default function SkillsPage() {
             onChange={(e) => setForm({ ...form, name: e.target.value })} />
         </div>
         <div className="field">
-          <label className="label">描述</label>
+          <label className="label">描述（可选）</label>
           <input className="input" placeholder="该 Skill 的作用说明" value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })} />
         </div>
         <div className="field">
           <label className="label">类型</label>
           <select className="select" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as any })}>
-            <option value="API_ENDPOINT">API_ENDPOINT（HTTP 调用外部技能）</option>
-            <option value="GIT_REPO">GIT_REPO（从 Git 拉取脚本，Phase 2 支持）</option>
+            <option value="API_ENDPOINT">API_ENDPOINT — HTTP 调用外部技能</option>
+            <option value="GIT_REPO">GIT_REPO — 从 Git 拉取脚本（Phase 2 执行）</option>
           </select>
         </div>
         <div className="field">
@@ -182,11 +223,14 @@ export default function SkillsPage() {
               <option key={k} value={k}>{v}</option>
             ))}
           </select>
+          <p style={{ fontSize: 11, color: 'var(--muted-2)', margin: '4px 0 0' }}>
+            运行时若该工具节点存在已启用 API_ENDPOINT Skill，将以外部调用替代内置逻辑
+          </p>
         </div>
         {form.type === 'API_ENDPOINT' ? (
           <>
             <div className="field">
-              <label className="label">端点地址（endpoint_url）</label>
+              <label className="label">端点地址</label>
               <input className="input" placeholder="https://your-skill-service/run" value={form.endpointUrl}
                 onChange={(e) => setForm({ ...form, endpointUrl: e.target.value })} />
             </div>

@@ -25,7 +25,7 @@ public class ImaCredentialController {
     public ImaCredentialController(ImaCredentialRepository credentialRepository,
                                     EncryptionService encryptionService,
                                     ImaSearchService imaSearchService,
-                                    @Value("${ima.openapi-base-url:https://ima.qq.com/openapi/note/v1}") String defaultBaseUrl) {
+                                    @Value("${ima.openapi-base-url:https://ima.qq.com/openapi/wiki/v1}") String defaultBaseUrl) {
         this.credentialRepository = credentialRepository;
         this.encryptionService = encryptionService;
         this.imaSearchService = imaSearchService;

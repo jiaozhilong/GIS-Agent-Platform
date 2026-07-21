@@ -50,20 +50,10 @@
   }
 }
 
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-}
-
+/* #root 由 theme.css 控制 (height: 100%)，此处不覆盖 */
 body {
   margin: 0;
+  overflow: hidden; /* 禁止 body 级滚动，滚动交由各面板内部处理 */
 }
 
 h1,

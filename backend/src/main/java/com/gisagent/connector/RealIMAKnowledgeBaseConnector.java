@@ -21,17 +21,17 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * IMA 知识库连接器真实实现。
- * 调用 IMA 开放接口（笔记检索）作为方案生成的知识源。
- * 当 ima.mock-enabled=false 时启用。凭证按用户通过 {@link ImaAuth} 传入（不落全局环境变量、不落库明文）。
- * Base URL 默认 https://ima.qq.com/openapi/note/v1，可由 ImaAuth.baseUrl 或 ima.openapi-base-url 覆盖。
+ * IMA 知识库连接器真实实现（Wiki API v1）。
+ * 调用 IMA 开放接口（知识库搜索/检索/列表）作为方案生成的知识源。
+ * 当 ima.mock-enabled=false 时启用。凭证按用户通过 {@link ImaAuth} 传入。
+ * Base URL 默认 https://ima.qq.com/openapi/wiki/v1。
  */
 @Component
 @ConditionalOnProperty(name = "ima.mock-enabled", havingValue = "false")
 public class RealIMAKnowledgeBaseConnector implements IMAKnowledgeBaseConnector {
 
     private static final Logger log = LoggerFactory.getLogger(RealIMAKnowledgeBaseConnector.class);
-    private static final String DEFAULT_BASE = "https://ima.qq.com/openapi/note/v1";
+    private static final String DEFAULT_BASE = "https://ima.qq.com/openapi/wiki/v1";
 
     private RestTemplate restTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -78,14 +78,12 @@ public class RealIMAKnowledgeBaseConnector implements IMAKnowledgeBaseConnector 
             return false;
         }
         try {
-            String url = resolveBaseUrl(auth) + "/search_note_book";
-            Map<String, Object> body = Map.of(
-                    "search_type", 0,
-                    "query_info", Map.of("title", "test"),
-                    "start", 0, "end", 1);
+            String url = resolveBaseUrl(auth) + "/search_knowledge_base";
+            Map<String, Object> body = Map.of("query", "", "cursor", "", "limit", 1);
             HttpEntity<Map<String, Object>> req = new HttpEntity<>(body, authHeaders(auth));
-            restTemplate.postForEntity(url, req, String.class);
-            return true;
+            String resp = restTemplate.postForEntity(url, req, String.class).getBody();
+            JsonNode root = objectMapper.readTree(resp);
+            return root.path("code").asInt() == 0;
         } catch (Exception e) {
             log.warn("[IMA] 连接测试失败: {}", e.getMessage());
             return false;
@@ -100,40 +98,40 @@ public class RealIMAKnowledgeBaseConnector implements IMAKnowledgeBaseConnector 
             return Collections.emptyList();
         }
         try {
-            String url = resolveBaseUrl(auth) + "/search_note_book";
+            String url = resolveBaseUrl(auth) + "/search_knowledge";
             Map<String, Object> body = Map.of(
-                    "search_type", 0,
-                    "query_info", Map.of("title", query == null ? "" : query),
-                    "start", 0, "end", Math.max(1, options.topK()));
+                    "query", query == null ? "" : query,
+                    "cursor", "",
+                    "knowledge_base_id", kbId == null ? "" : kbId);
             HttpEntity<Map<String, Object>> req = new HttpEntity<>(body, authHeaders(auth));
             String resp = restTemplate.postForEntity(url, req, String.class).getBody();
-            return parseNotes(resp, kbId);
+            return parseSearchResults(resp, kbId);
         } catch (Exception e) {
             log.warn("[IMA] 检索失败: {}", e.getMessage());
             return Collections.emptyList();
         }
     }
 
-    private List<SearchResult> parseNotes(String resp, String kbId) {
+    private List<SearchResult> parseSearchResults(String resp, String kbId) {
         List<SearchResult> out = new ArrayList<>();
         if (resp == null || resp.isBlank()) return out;
         try {
             JsonNode root = objectMapper.readTree(resp);
-            JsonNode data = root.path("data");
-            JsonNode notes = data.path("notes");
-            if (!notes.isArray()) notes = data.path("list");
-            if (!notes.isArray()) notes = data.path("note_list");
-            if (!notes.isArray()) return out;
-            double score = 0.9;
-            for (JsonNode n : notes) {
-                String docId = n.path("doc_id").asText(n.path("id").asText(""));
-                String title = n.path("title").asText(n.path("name").asText(""));
-                String content = n.path("content").asText(n.path("summary").asText(n.path("content_preview").asText("")));
-                if (title.isBlank() && content.isBlank()) continue;
+            if (root.path("code").asInt() != 0) return out;
+            JsonNode list = root.path("data").path("info_list");
+            if (!list.isArray()) return out;
+            double score = 0.92;
+            for (JsonNode n : list) {
+                String mediaId = n.path("media_id").asText("");
+                String title = n.path("title").asText("");
+                String highlight = n.path("highlight_content").asText("");
+                if (title.isBlank() && highlight.isBlank()) continue;
                 out.add(new SearchResult(
-                        docId.isBlank() ? "ima-" + UUID.randomUUID().toString().substring(0, 8) : docId,
-                        title, content, score, kbId, Instant.now()));
-                score -= 0.05;
+                        mediaId.isBlank() ? "ima-" + UUID.randomUUID().toString().substring(0, 8) : mediaId,
+                        title, highlight.isBlank() ? title : highlight,
+                        score, kbId, Instant.now()));
+                score -= 0.03;
+                if (score < 0.5) score = 0.5;
             }
         } catch (Exception e) {
             log.warn("[IMA] 解析检索响应失败", e);
@@ -143,7 +141,8 @@ public class RealIMAKnowledgeBaseConnector implements IMAKnowledgeBaseConnector 
 
     @Override
     public KBInfo getKBInfo(String kbId) {
-        return new KBInfo(kbId, "IMA 笔记知识源（真实）", "notes", -1, Instant.now());
+        // Wiki API 没有单独的 getKBInfo，通过 listKnowledgeBases 的缓存替代
+        return new KBInfo(kbId, "IMA 知识库（Wiki v1）", "subscribed", -1, Instant.now());
     }
 
     @Override
@@ -153,43 +152,40 @@ public class RealIMAKnowledgeBaseConnector implements IMAKnowledgeBaseConnector 
             log.warn("[IMA] 未配置 Client ID / API Key，跳过拉取知识库列表");
             return Collections.emptyList();
         }
+        List<KBInfo> all = new ArrayList<>();
+        String cursor = "";
         try {
-            String url = resolveBaseUrl(auth) + "/list_note_book";
-            HttpEntity<Map<String, Object>> req = new HttpEntity<>(Map.of("start", 0, "end", 200), authHeaders(auth));
-            String resp = restTemplate.postForEntity(url, req, String.class).getBody();
-            return parseBookList(resp);
-        } catch (Exception e) {
-            log.warn("[IMA] 拉取知识库列表失败: {}", e.getMessage());
-            return Collections.emptyList();
-        }
-    }
-
-    private List<KBInfo> parseBookList(String resp) {
-        List<KBInfo> out = new ArrayList<>();
-        if (resp == null || resp.isBlank()) return out;
-        try {
-            JsonNode root = objectMapper.readTree(resp);
-            JsonNode data = root.path("data");
-            JsonNode list = data.path("note_book_list");
-            if (!list.isArray()) list = data.path("book_list");
-            if (!list.isArray()) list = data.path("list");
-            if (!list.isArray()) list = data.path("note_books");
-            if (!list.isArray()) return out;
-            for (JsonNode n : list) {
-                String kbId = n.path("note_book_id").asText(n.path("kb_id").asText(n.path("id").asText("")));
-                String kbName = n.path("note_book_name").asText(n.path("kb_name").asText(n.path("name").asText("")));
-                if (kbId.isBlank() && kbName.isBlank()) continue;
-                String kbType = n.path("type").asText(n.path("kb_type").asText("")).toLowerCase().contains("own") ? "owned" : "subscribed";
-                long docCount = n.path("doc_count").asLong(n.path("note_count").asLong(-1));
-                out.add(new KBInfo(
-                        kbId.isBlank() ? "ima-" + UUID.randomUUID().toString().substring(0, 8) : kbId,
-                        kbName.isBlank() ? kbId : kbName,
-                        kbType, docCount, Instant.now()));
+            String url = resolveBaseUrl(auth) + "/search_knowledge_base";
+            while (true) {
+                Map<String, Object> body = Map.of("query", "", "cursor", cursor, "limit", 20);
+                HttpEntity<Map<String, Object>> req = new HttpEntity<>(body, authHeaders(auth));
+                String resp = restTemplate.postForEntity(url, req, String.class).getBody();
+                if (resp == null) break;
+                JsonNode root = objectMapper.readTree(resp);
+                if (root.path("code").asInt() != 0) break;
+                JsonNode data = root.path("data");
+                JsonNode list = data.path("info_list");
+                if (!list.isArray()) break;
+                for (JsonNode n : list) {
+                    String kbId = n.path("kb_id").asText("");
+                    String kbName = n.path("kb_name").asText("");
+                    if (kbId.isBlank() || kbName.isBlank()) continue;
+                    String roleType = n.path("role_type").asText("");
+                    String kbType = "subscribed";
+                    if (roleType.contains("创建")) kbType = "owned";
+                    else if (roleType.contains("普通")) kbType = "subscribed";
+                    long docCount = n.path("content_count").asLong(-1);
+                    all.add(new KBInfo(kbId, kbName, kbType, docCount, Instant.now()));
+                }
+                boolean isEnd = data.path("is_end").asBoolean(true);
+                if (isEnd) break;
+                cursor = data.path("next_cursor").asText("");
+                if (cursor.isBlank()) break;
             }
         } catch (Exception e) {
-            log.warn("[IMA] 解析知识库列表响应失败", e);
+            log.warn("[IMA] 拉取知识库列表失败: {}", e.getMessage());
         }
-        return out;
+        return all;
     }
 
     @Override

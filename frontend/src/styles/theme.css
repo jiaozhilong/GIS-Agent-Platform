@@ -289,8 +289,16 @@ button { cursor: pointer; border: none; background: none; }
 .toast i.danger { background: var(--danger); color: #2a0a06; }
 
 /* ===== 布局 ===== */
-.app-shell { display: grid; grid-template-columns: var(--sidebar-w) 1fr; min-height: 100vh; }
-.main-area { grid-column: 2; padding: 32px 40px; min-width: 0; }
+.app-shell { display: grid; grid-template-columns: var(--sidebar-w) 1fr; height: 100vh; overflow: hidden; }
+.main-area {
+  grid-column: 2;
+  padding: 32px 40px 32px 40px;
+  min-width: 0;
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  /* 滚动条在面板内部，不污染 body */
+}
 
 /* ===== 顶栏 + 通知中心 ===== */
 .topbar { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin: -8px 0 8px; }
@@ -387,5 +395,5 @@ button { cursor: pointer; border: none; background: none; }
 
 @media (max-width: 760px) {
   .app-shell { grid-template-columns: 1fr; }
-  .main-area { grid-column: 1; padding: 20px; }
+  .main-area { grid-column: 1; padding: 20px; height: 100vh; }
 }

@@ -42,6 +42,8 @@ export const authApi = {
 // ===== 用户管理（P6-2 平台管理员）=====
 export const adminApi = {
   listUsers: () => apiClient.get('/admin/users'),
+  createUser: (data: { username: string; password: string; displayName?: string; email?: string; role?: string }) =>
+    apiClient.post('/admin/users', data),
   changeRole: (id: number, role: string) => apiClient.post(`/admin/users/${id}/role`, { role }),
   toggleEnabled: (id: number) => apiClient.post(`/admin/users/${id}/toggle-enabled`),
 };
