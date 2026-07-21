@@ -15,6 +15,10 @@ frontend/dist/
 .DS_Store
 Thumbs.db
 
+# Heap dump (OOM 诊断产物，勿提交)
+*.hprof
+heapdump.hprof
+
 # Environment
 .env
 .env.local

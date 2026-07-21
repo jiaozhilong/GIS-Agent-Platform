@@ -1,17 +1,30 @@
 package com.gisagent.service;
 
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpRequest;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.ClientHttpRequest;
+import org.springframework.http.client.ClientHttpRequestExecution;
+import org.springframework.http.client.ClientHttpRequestInterceptor;
+import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RequestCallback;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.ResponseExtractor;
 import org.springframework.web.client.RestTemplate;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -41,6 +54,8 @@ public class LlmService {
         factory.setConnectTimeout(Duration.ofSeconds(10));
         factory.setReadTimeout(Duration.ofSeconds(configuredTimeout));
         this.restTemplate = new RestTemplate(factory);
+        // 禁用 HTTP keep-alive 复用：避免复用被服务端关闭的陈旧连接导致 Connection reset
+        this.restTemplate.getInterceptors().add(new CloseConnectionInterceptor());
     }
 
     /**
@@ -91,36 +106,12 @@ public class LlmService {
         body.put("temperature", temperature != null ? temperature : 0.3);
         body.put("max_tokens", maxTokens != null ? maxTokens : 2048);
 
-        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
-
         try {
-            ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
-            String respBody = response.getBody();
-            return new CompletionResult(extractContent(respBody), extractUsage(respBody));
-        } catch (Exception e) {
-            log.error("LLM 调用失败: endpoint={}, model={}", endpoint, model, e);
-            throw new RuntimeException("LLM 调用失败: " + e.getMessage(), e);
-        }
-    }
-
-    /** 从响应体解析 usage（缺失/异常时返回 ZERO） */
-    private LlmUsage extractUsage(String responseBody) {
-        if (responseBody == null || responseBody.isBlank()) {
-            return LlmUsage.ZERO;
-        }
-        try {
-            JsonNode root = objectMapper.readTree(responseBody);
-            JsonNode usage = root.path("usage");
-            if (usage.isMissingNode() || usage.isNull()) {
-                return LlmUsage.ZERO;
-            }
-            return new LlmUsage(
-                    usage.path("prompt_tokens").asLong(0),
-                    usage.path("completion_tokens").asLong(0),
-                    usage.path("total_tokens").asLong(0));
-        } catch (Exception e) {
-            log.warn("解析 LLM usage 失败，按 0 计", e);
-            return LlmUsage.ZERO;
+            // 流式解析：仅抽取 content + usage，巨长 reasoning_content 边读边丢，避免整段驻留内存
+            return withRetry(() -> streamComplete(url, headers, body), "LLM 调用");
+        } catch (RuntimeException e) {
+            log.error("LLM 调用失败: endpoint={}, model={}, msg={}", endpoint, model, e.getMessage());
+            throw e;
         }
     }
 
@@ -183,6 +174,112 @@ public class LlmService {
         }
     }
 
+    /**
+     * 对瞬时 I/O 异常（连接重置/超时/断连）重试一次，避免偶发网络抖动直接打断管道。
+     * 重试间隔 500ms，最多 1 次重试（共 2 次尝试）。
+     */
+    private <T> T withRetry(ThrowingSupplier<T> action, String what) {
+        int maxAttempts = 2;
+        Exception last = null;
+        for (int i = 0; i < maxAttempts; i++) {
+            try {
+                return action.get();
+            } catch (Exception e) {
+                if (isTransient(e) && i < maxAttempts - 1) {
+                    log.warn("{} 瞬时失败，{}/{} 重试: {}", what, i + 1, maxAttempts - 1, e.getMessage());
+                    try {
+                        Thread.sleep(500L * (i + 1));
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                    }
+                    last = e;
+                    continue;
+                }
+                throw new RuntimeException(what + " 失败: " + e.getMessage(), e);
+            }
+        }
+        throw new RuntimeException(what + " 失败: " + (last != null ? last.getMessage() : "未知错误"));
+    }
+
+    /** 判断是否为可重试的瞬时网络异常（沿 cause 链查找） */
+    private boolean isTransient(Throwable e) {
+        Throwable c = e;
+        while (c != null) {
+            if (c instanceof java.net.SocketException
+                    || c instanceof java.net.ConnectException
+                    || c instanceof java.io.IOException
+                    || c instanceof org.springframework.web.client.ResourceAccessException) {
+                return true;
+            }
+            c = c.getCause();
+        }
+        return false;
+    }
+
+    /** 流式发起 chat 补全并抽取 content + usage，避免整段缓存巨型响应体（推理模型 reasoning_content 很长） */
+    private CompletionResult streamComplete(String url, HttpHeaders headers, Map<String, Object> body) {
+        byte[] bodyBytes;
+        try {
+            bodyBytes = objectMapper.writeValueAsBytes(body);
+        } catch (IOException e) {
+            throw new RuntimeException("序列化 LLM 请求体失败", e);
+        }
+        return restTemplate.execute(url, HttpMethod.POST,
+                req -> {
+                    req.getHeaders().addAll(headers);
+                    req.getBody().write(bodyBytes);
+                },
+                response -> {
+                    try (InputStream is = response.getBody()) {
+                        return extractChatResponse(is);
+                    } catch (IOException e) {
+                        throw new RuntimeException("读取 LLM 响应失败", e);
+                    }
+                });
+    }
+
+    /** 流式解析 chat.completion：仅保留 message.content 与 usage，丢弃 reasoning_content 等大字段 */
+    private CompletionResult extractChatResponse(InputStream is) throws IOException {
+        JsonParser p = objectMapper.getFactory().createParser(is);
+        String content = "";
+        long promptTokens = 0, completionTokens = 0, totalTokens = 0;
+        JsonToken t;
+        while ((t = p.nextToken()) != null) {
+            if (t != JsonToken.FIELD_NAME) continue;
+            String name = p.getCurrentName();
+            if ("content".equals(name)) {
+                p.nextToken();
+                if (p.hasToken(JsonToken.VALUE_STRING)) content = p.getText();
+            } else if ("reasoning_content".equals(name)) {
+                p.nextToken(); // 跳过，不驻留
+            } else if ("usage".equals(name) && p.nextToken() == JsonToken.START_OBJECT) {
+                while (p.nextToken() != JsonToken.END_OBJECT) {
+                    String un = p.getCurrentName();
+                    p.nextToken();
+                    if ("prompt_tokens".equals(un)) promptTokens = p.getLongValue();
+                    else if ("completion_tokens".equals(un)) completionTokens = p.getLongValue();
+                    else if ("total_tokens".equals(un)) totalTokens = p.getLongValue();
+                }
+            }
+        }
+        return new CompletionResult(content, new LlmUsage(promptTokens, completionTokens, totalTokens));
+    }
+
+    /** 禁用 HTTP keep-alive 复用，避免复用被服务端关闭的陈旧连接导致 Connection reset */
+    private static class CloseConnectionInterceptor implements ClientHttpRequestInterceptor {
+        @Override
+        public ClientHttpResponse intercept(HttpRequest request, byte[] body, ClientHttpRequestExecution execution) throws IOException {
+            request.getHeaders().set("Connection", "close");
+            return execution.execute(request, body);
+        }
+    }
+
+    /** 受检供给接口，供 withRetry 使用 */
+    @FunctionalInterface
+    private interface ThrowingSupplier<T> {
+        T get() throws Exception;
+    }
+
     private String ensureChatCompletionsUrl(String endpoint) {
         if (endpoint == null || endpoint.isBlank()) {
             throw new IllegalArgumentException("LLM endpoint 不能为空");
@@ -199,7 +296,9 @@ public class LlmService {
 
     /**
      * 调用 embedding 模型，返回浮点数向量（1536 维）。
-     * 兼容 OpenAI / DeepSeek embedding API（/v1/embeddings）。
+     * 兼容 OpenAI embedding API（/v1/embeddings）。
+     * 注意：DeepSeek 等部分厂商不支持 embedding API，会返回 HTTP 404/400。
+     * 此时本方法返回 null，调用方应据此跳过向量化。
      *
      * @param endpoint API 地址
      * @param apiKey   API Key
@@ -219,13 +318,21 @@ public class LlmService {
         body.put("model", "text-embedding-ada-002"); // OpenAI compatible
         body.put("input", text);
 
-        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
-
         try {
-            ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
-            return extractEmbedding(response.getBody());
-        } catch (Exception e) {
-            log.error("Embedding 调用失败: endpoint={}", endpoint, e);
+            // 使用流式解析，避免 postForEntity(String.class) 缓冲整个响应体
+            ResponseEntity<String> entity = restTemplate.postForEntity(url,
+                    new HttpEntity<>(body, headers), String.class);
+            if (!entity.getStatusCode().is2xxSuccessful()) {
+                log.debug("Embedding API 返回非 2xx: {} (endpoint={})", entity.getStatusCode(), endpoint);
+                return null;
+            }
+            return extractEmbedding(entity.getBody());
+        } catch (HttpClientErrorException e) {
+            // 404/400 等客户端错误：API 不支持，不打印堆栈
+            log.debug("Embedding API 不可用: {} (endpoint={})", e.getStatusCode(), endpoint);
+            return null;
+        } catch (RuntimeException e) {
+            log.warn("Embedding 调用失败: endpoint={}, msg={}", endpoint, e.getMessage());
             return null;
         }
     }
@@ -265,23 +372,6 @@ public class LlmService {
         } catch (Exception e) {
             log.warn("解析 Embedding 响应失败", e);
             return null;
-        }
-    }
-
-    private String extractContent(String responseBody) {
-        if (responseBody == null || responseBody.isBlank()) {
-            return "";
-        }
-        try {
-            JsonNode root = objectMapper.readTree(responseBody);
-            JsonNode choices = root.path("choices");
-            if (choices.isArray() && choices.size() > 0) {
-                return choices.get(0).path("message").path("content").asText("");
-            }
-            return "";
-        } catch (Exception e) {
-            log.warn("解析 LLM 响应失败，返回原始文本", e);
-            return responseBody;
         }
     }
 }

@@ -213,21 +213,27 @@ public class PipelineEngine {
         }
 
         saveAll(execMap);
+        logMem("saveAll 后");
         finishRun(run, context, anyFailed);
+        logMem("finishRun 后, contextJson 长度={}", run.getContextJson() != null ? run.getContextJson().length() : 0);
 
         // 版本快照 + 向量索引
         if (!"FAILED".equals(run.getStatus())) {
             try {
                 ProjectVersion v = versionService.snapshot(projectId, run.getContextJson(), triggerType, null, null);
                 if (v != null) log.info("已自动保存版本快照 v{} (trigger={})", v.getVersionNo(), triggerType);
+                logMem("snapshot 后");
             } catch (Exception e) {
                 log.warn("版本快照保存失败（不影响主流程）: {}", e.getMessage());
             }
             try {
                 String generatedContent = buildIndexableContent(context);
+                logMem("buildIndexableContent 后, 文本长度={}", generatedContent != null ? generatedContent.length() : -1);
                 if (generatedContent != null && !generatedContent.isBlank()) {
                     embeddingService.clearProject(projectId);
+                    logMem("clearProject 后");
                     embeddingService.indexText(projectId, "GENERATED", generatedContent, null);
+                    logMem("indexText 后");
                 }
             } catch (Exception e) {
                 log.warn("向量化索引失败（不影响主流程）: {}", e.getMessage());
@@ -567,5 +573,14 @@ public class PipelineEngine {
         } catch (Exception e) {
             return "{}";
         }
+    }
+
+    /** 输出当前堆内存使用情况，辅助排查 OOM */
+    private void logMem(String label, Object... args) {
+        Runtime rt = Runtime.getRuntime();
+        long used = rt.totalMemory() - rt.freeMemory();
+        long max = rt.maxMemory();
+        String msg = String.format(label.replace("{}", "%s"), args);
+        log.info("[MEM] {} — 已用: {}MB / 最大: {}MB", msg, used / 1024 / 1024, max / 1024 / 1024);
     }
 }

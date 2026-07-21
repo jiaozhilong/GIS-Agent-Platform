@@ -35,8 +35,13 @@ public class EmbeddingService {
     private static final int CHUNK_SIZE = 800;
     private static final int CHUNK_OVERLAP = 100;
 
+    /** 单次向量化允许的最大文本长度（字符），超过则截断 */
+    private static final int MAX_INDEX_TEXT_LENGTH = 50_000;
+
     /**
      * 将文本分块、向量化后写入 kb_documents。
+     * 注意：若 LLM Provider 不支持 embedding API（如 DeepSeek），
+     * 首次调用即返回 null，后续不再重试，避免无效 HTTP 调用累积内存压力。
      */
     @Transactional
     public int indexText(Long projectId, String source, String text, String metadata) {
@@ -48,12 +53,30 @@ public class EmbeddingService {
         String apiKey = encryptionService.decrypt(provider.getApiKeyEncrypted());
         String endpoint = provider.getEndpoint();
 
-        List<String> chunks = chunkText(text);
+        // 先探测一次 embedding 是否可用，不可用直接跳过全部
+        // 必须在 chunkText 之前执行，避免无效内存分配
+        float[] probeVec = llmService.embedding(endpoint, apiKey, "test");
+        if (probeVec == null) {
+            log.info("Embedding API 不可用（{}），跳过向量化 (project={})", endpoint, projectId);
+            return 0;
+        }
+
+        // 防止超大文本撑爆堆：截断到安全上限
+        String safeText = text;
+        if (text != null && text.length() > MAX_INDEX_TEXT_LENGTH) {
+            log.warn("向量化文本过长 ({} 字符)，截断至 {} 字符", text.length(), MAX_INDEX_TEXT_LENGTH);
+            safeText = text.substring(0, MAX_INDEX_TEXT_LENGTH);
+        }
+
+        List<String> chunks = chunkText(safeText);
+        if (chunks.isEmpty()) {
+            return 0;
+        }
 
         int written = 0;
         for (int i = 0; i < chunks.size(); i++) {
             String chunk = chunks.get(i);
-            float[] vec = llmService.embedding(endpoint, apiKey, chunk);
+            float[] vec = i == 0 ? probeVec : llmService.embedding(endpoint, apiKey, chunk);
             if (vec == null) {
                 log.warn("Embedding 失败，跳过 chunk {} (project={})", i, projectId);
                 continue;
@@ -139,28 +162,42 @@ public class EmbeddingService {
         });
     }
 
+    /**
+     * 文本分块：按段落 + 重叠滑动窗口。
+     * 对超大文本做保护，避免 substring 产生大量内存分配。
+     */
     List<String> chunkText(String text) {
         if (text == null || text.isBlank()) {
             return List.of();
         }
-        List<String> chunks = new ArrayList<>();
+        // 预计算 chunk 数量，避免 ArrayList 反复扩容
+        int estimatedChunks = (text.length() / (CHUNK_SIZE - CHUNK_OVERLAP)) + 1;
+        List<String> chunks = new ArrayList<>(estimatedChunks);
+        int len = text.length();
         int start = 0;
-        while (start < text.length()) {
-            int end = Math.min(start + CHUNK_SIZE, text.length());
-            if (end < text.length()) {
+        while (start < len) {
+            int end = Math.min(start + CHUNK_SIZE, len);
+            if (end < len) {
+                // 优先在换行处断开
                 int br = text.lastIndexOf('\n', end);
                 if (br > start + CHUNK_SIZE / 2) {
                     end = br;
                 } else {
+                    // 其次在句号处断开
                     int dot = text.lastIndexOf('。', end);
                     if (dot > start + CHUNK_SIZE / 2) {
                         end = dot + 1;
                     }
                 }
             }
-            chunks.add(text.substring(start, end).trim());
+            // substring 在 Java 7+ 会复制底层数组，对大文本需要控制频率
+            String chunk = text.substring(start, end);
+            if (!chunk.isBlank()) {
+                chunks.add(chunk);
+            }
             start = end - CHUNK_OVERLAP;
             if (start < 0) start = 0;
+            // 防止死循环：确保 start 前进
             if (start >= end) start = end;
         }
         return chunks;
