@@ -100,6 +100,7 @@ export const skillApi = {
   create: (data: any) => apiClient.post('/skills', data),
   update: (id: number, data: any) => apiClient.put(`/skills/${id}`, data),
   remove: (id: number) => apiClient.delete(`/skills/${id}`),
+  test: (id: number) => apiClient.post(`/skills/${id}/test`),
 };
 
 // ===== Template (流程模板) API =====

@@ -11,6 +11,7 @@ import com.gisagent.service.LlmService;
 import com.gisagent.service.LlmUsage;
 import com.gisagent.service.EmbeddingService;
 import com.gisagent.service.BillingService;
+import com.gisagent.service.SkillService;
 import com.gisagent.util.FileTextExtractor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -47,6 +48,8 @@ public class PipelineEngine {
     private final EmbeddingService embeddingService;
     private final BillingService billingService;
     private final ProjectRepository projectRepository;
+    private final SkillRepository skillRepository;
+    private final SkillService skillService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /** toolType → 实际工具实例，用于按模板工具链解析 */
@@ -90,7 +93,9 @@ public class PipelineEngine {
                           com.gisagent.service.ProjectVersionService versionService,
                           EmbeddingService embeddingService,
                           BillingService billingService,
-                          ProjectRepository projectRepository) {
+                          ProjectRepository projectRepository,
+                          SkillRepository skillRepository,
+                          SkillService skillService) {
         this.requirementAnalysisTool = requirementAnalysisTool;
         this.productMatchingTool = productMatchingTool;
         this.caseRecommendTool = caseRecommendTool;
@@ -108,6 +113,8 @@ public class PipelineEngine {
         this.embeddingService = embeddingService;
         this.billingService = billingService;
         this.projectRepository = projectRepository;
+        this.skillRepository = skillRepository;
+        this.skillService = skillService;
 
         TOOL_BY_TYPE.put("REQUIREMENT_ANALYSIS", requirementAnalysisTool);
         TOOL_BY_TYPE.put("PRODUCT_MATCHING", productMatchingTool);
@@ -141,12 +148,12 @@ public class PipelineEngine {
         run.setStartedAt(Instant.now());
         pipelineRunRepository.save(run);
 
-        List<PipelineTool> tools = resolveTools(templateId);
-
         ToolContext context = ToolContext.empty();
         context.setRequirementDoc(loadRequirementDoc(projectId));
         // 按用户隔离 IMA：把触发用户 ID 写入上下文（供工具链检索该用户自己的知识库）
         projectRepository.findById(projectId).ifPresent(p -> context.setUserId(p.getUserId()));
+
+        List<PipelineTool> tools = resolveTools(templateId, context.getUserId());
         // 运行时指定的知识库过滤（空表示使用所有启用库，向后兼容）
         context.setKbConfigIds(kbConfigIds);
 
@@ -315,8 +322,11 @@ public class PipelineEngine {
 
     /**
      * 根据模板 key 解析工具链：DB 模板优先，缺失时回退硬编码链。
+     * 每个工具节点若已绑定「启用且 API_ENDPOINT 类型」的 Skill，则以 SkillTool 包裹替代内置逻辑。
+     *
+     * @param userId 触发用户（用于按用户隔离查找 Skill）
      */
-    private List<PipelineTool> resolveTools(String templateId) {
+    private List<PipelineTool> resolveTools(String templateId, Long userId) {
         if (templateId != null) {
             Optional<PipelineTemplate> tpl = templateRepository.findByTemplateKey(templateId);
             if (tpl.isPresent() && tpl.get().getToolChainJson() != null) {
@@ -325,7 +335,7 @@ public class PipelineEngine {
                             tpl.get().getToolChainJson(), new TypeReference<List<String>>() {});
                     List<PipelineTool> tools = new ArrayList<>();
                     for (String type : chain) {
-                        PipelineTool tool = TOOL_BY_TYPE.get(type);
+                        PipelineTool tool = resolveToolInstance(type, userId);
                         if (tool != null) tools.add(tool);
                     }
                     if (!tools.isEmpty()) {
@@ -337,7 +347,33 @@ public class PipelineEngine {
                 }
             }
         }
-        return FALLBACK_TOOLS.getOrDefault(templateId, FALLBACK_TOOLS.get("quick_selection"));
+        // 回退链同样支持 Skill 替换
+        List<PipelineTool> fallback = FALLBACK_TOOLS.getOrDefault(templateId, FALLBACK_TOOLS.get("quick_selection"));
+        List<PipelineTool> tools = new ArrayList<>();
+        for (PipelineTool t : fallback) {
+            PipelineTool resolved = resolveToolInstance(t.getToolType(), userId);
+            tools.add(resolved != null ? resolved : t);
+        }
+        return tools;
+    }
+
+    /**
+     * 解析单个工具节点：若该 toolType 存在已启用 API_ENDPOINT 类型 Skill，则返回 SkillTool 包裹，
+     * 否则返回内置工具实例。GIT_REPO 类型 Skill 暂不参与运行时执行（Phase 2 沙箱支持），回退内置。
+     */
+    private PipelineTool resolveToolInstance(String toolType, Long userId) {
+        PipelineTool builtin = TOOL_BY_TYPE.get(toolType);
+        if (userId == null) return builtin;
+        try {
+            Skill bound = skillService.resolveForTool(toolType);
+            if (bound != null) {
+                log.info("[Skill] 工具 {} 绑定 Skill#{}（{}）", toolType, bound.getId(), bound.getName());
+                return new SkillTool(toolType, bound, skillService);
+            }
+        } catch (Exception e) {
+            log.warn("[Skill] 解析绑定失败，回退内置工具 {}: {}", toolType, e.getMessage());
+        }
+        return builtin;
     }
 
     /**

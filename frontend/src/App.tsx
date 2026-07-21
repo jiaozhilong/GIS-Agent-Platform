@@ -10,6 +10,7 @@ import ProjectDetailPage from './pages/ProjectDetailPage';
 import PipelineRunPage from './pages/PipelineRunPage';
 import LlmConfigPage from './pages/LlmConfigPage';
 import ImaConfigPage from './pages/ImaConfigPage';
+import SkillsPage from './pages/SkillsPage';
 import PipelinePage from './pages/PipelinePage';
 import TemplatesPage from './pages/TemplatesPage';
 import TeamsPage from './pages/TeamsPage';
@@ -50,6 +51,7 @@ function App() {
             <Route path="projects/:id/run" element={<PipelineRunPage />} />
             <Route path="settings/llm" element={<LlmConfigPage />} />
             <Route path="settings/ima" element={<ImaConfigPage />} />
+            <Route path="settings/skills" element={<SkillsPage />} />
             <Route path="pipeline" element={<PipelinePage />} />
             <Route path="templates" element={<TemplatesPage />} />
             <Route path="teams" element={<TeamsPage />} />

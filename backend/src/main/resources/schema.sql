@@ -382,3 +382,25 @@ CREATE TABLE IF NOT EXISTS invoices (
 CREATE INDEX IF NOT EXISTS idx_usage_quotas_org ON usage_quotas(organization_id);
 CREATE INDEX IF NOT EXISTS idx_invoices_org ON invoices(organization_id);
 CREATE INDEX IF NOT EXISTS idx_invoices_month ON invoices(period_month);
+
+-- ============================================================
+-- 可编排 Skill（外部能力，绑定流水线工具节点）
+-- ============================================================
+CREATE TABLE IF NOT EXISTS skills (
+    id                BIGSERIAL PRIMARY KEY,
+    owner_id          BIGINT       NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name              VARCHAR(128) NOT NULL,
+    description       VARCHAR(1024),
+    type              VARCHAR(32)  NOT NULL DEFAULT 'API_ENDPOINT',  -- API_ENDPOINT | GIT_REPO
+    tool_type         VARCHAR(64)  NOT NULL,          -- 绑定的流水线工具节点（REQUIREMENT_ANALYSIS / PPT_OUTPUT ...）
+    endpoint_url      VARCHAR(512),                   -- API_ENDPOINT 服务地址
+    api_key_encrypted VARCHAR(512),                   -- 可选鉴权密钥（加密存储）
+    request_template  VARCHAR(4096),                  -- 请求体模板 / 附加 Prompt
+    git_repo_url      VARCHAR(512),                   -- GIT_REPO 仓库地址
+    git_ref           VARCHAR(128),                   -- GIT_REPO 分支 / tag / commit
+    enabled           BOOLEAN      NOT NULL DEFAULT TRUE,
+    created_at        TIMESTAMP    NOT NULL DEFAULT NOW(),
+    updated_at        TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_skills_owner ON skills(owner_id);
+CREATE INDEX IF NOT EXISTS idx_skills_tool ON skills(owner_id, tool_type);

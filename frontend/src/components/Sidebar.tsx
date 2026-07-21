@@ -14,6 +14,7 @@ const navItems = [
   { to: '/billing', label: '计费账单', icon: IconUsage, section: '协作' },
   { to: '/settings/llm', label: '大模型配置', icon: IconBrain, section: 'AI 配置' },
   { to: '/settings/ima', label: 'IMA 知识库', icon: IconBook, section: 'AI 配置' },
+  { to: '/settings/skills', label: '技能中心', icon: IconWand, section: 'AI 配置' },
   { to: '/pipeline', label: '流程编排', icon: IconFlow, section: '方案工作流' },
   { to: '/templates', label: '模板市场', icon: IconTemplate, section: '方案工作流' },
   { to: '/orchestrate', label: '智能编排', icon: IconWand, section: '方案工作流' },
