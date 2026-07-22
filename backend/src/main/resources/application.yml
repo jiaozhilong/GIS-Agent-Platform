@@ -38,10 +38,12 @@ llm:
   max-retries: 2
 
 # IMA Configuration
+# 默认连接真实 IMA API（Wiki v1）。仅当显式设置 IMA_MOCK_ENABLED=true
+# 且手动恢复 MockIMAKnowledgeBaseConnector 的 @Component 时才会走 Mock。
 ima:
   connect-timeout-seconds: 10
   search-timeout-seconds: 30
-  mock-enabled: ${IMA_MOCK_ENABLED:true}
+  mock-enabled: ${IMA_MOCK_ENABLED:false}
 
 # File Storage
 storage:
