@@ -24,10 +24,12 @@ public class User {
 
     /** 平台全局角色：SUPER_ADMIN / ADMIN / USER（区别于团队级 Role） */
     @Column(nullable = false, length = 16)
+    @Builder.Default
     private String role = "USER";
 
     /** 账号是否启用（禁用后无法登录） */
     @Column(nullable = false)
+    @Builder.Default
     private Boolean enabled = true;
 
     @Column(length = 128)
