@@ -301,6 +301,17 @@ export default function ProjectDetailPage() {
         <div className="modal-overlay" onClick={() => setRunConfigOpen(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h3 className="modal-title">运行配置</h3>
+            {providers.length === 0 && (
+              <div className="empty-state compact" style={{ marginBottom: 16, padding: '20px 18px' }}>
+                <p style={{ marginBottom: 12 }}>
+                  运行流水线需要先配置大模型（LLM Provider）。<br />
+                  请到「设置 → LLM 配置」添加 API Key 后再试。
+                </p>
+                <button className="btn btn-primary" onClick={() => navigate('/settings/llm')}>
+                  去配置大模型
+                </button>
+              </div>
+            )}
             <div className="form-group">
               <label>大模型</label>
               <select
