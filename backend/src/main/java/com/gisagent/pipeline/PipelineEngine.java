@@ -157,13 +157,14 @@ public class PipelineEngine {
         // 运行时指定的知识库过滤（空表示使用所有启用库，向后兼容）
         context.setKbConfigIds(kbConfigIds);
 
-        // 构建 toolType → 执行记录 映射
+        // 构建 toolType → 执行记录 映射，并立即持久化 PENDING 状态，前端可实时看到进度
         Map<String, ToolExecution> execMap = new LinkedHashMap<>();
         int order = 0;
         for (PipelineTool tool : tools) {
             ToolExecution exec = createToolExecution(run.getId(), tool.getToolType(), order++);
             exec.setLlmModel(llmConfig.model);
             execMap.put(tool.getToolType(), exec);
+            toolExecutionRepository.save(exec); // 逐个写入，前端轮询立即可见
         }
 
         // DAG 分组并行执行

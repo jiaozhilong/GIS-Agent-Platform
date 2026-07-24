@@ -232,7 +232,9 @@
 .result-card h3 { font-size: 14px; font-weight: 680; }
 .result-card p { font-size: 12px; color: var(--muted); line-height: 1.7; }
 .result-card-ops { display: flex; gap: 6px; flex-shrink: 0; }
-.result-card-body { padding-top: 4px; border-top: 1px solid var(--line); margin-top: 8px; }
+.result-card-body { padding-top: 4px; border-top: 1px solid var(--line); margin-top: 8px; max-height: 340px; overflow-y: auto; }
+.result-card-body::-webkit-scrollbar { width: 4px; }
+.result-card-body::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 4px; }
 .collapse-arrow { display: inline-block; width: 16px; font-size: 11px; color: var(--muted); transition: transform .2s ease; }
 .result-card.expanded .collapse-arrow { color: var(--mint); }
 .mini-btn {

@@ -240,15 +240,25 @@ export default function ProjectDetailPage() {
       return next;
     });
   };
-  // 产物首次加载时，默认展开最后一个（最新完成的）
+  // 产物变化时，自动展开 RUNNING 状态的工具 + 最后一个 SUCCESS 的工具，其余折叠
   useEffect(() => {
     const outputTools = tools.filter((t) => t.output);
-    if (outputTools.length > 0 && expandedCards.size === 0) {
-      const last = outputTools[outputTools.length - 1];
-      setExpandedCards(new Set([last.toolOrder]));
-      // 自动切换到最后一个工具所在阶段
-      const lastStep = STEP_DEFS.find((s) => s.tool === last.toolType);
-      if (lastStep) setActiveTab(lastStep.key);
+    if (outputTools.length === 0) return;
+    const newExpanded = new Set<number>();
+    // 展开所有 RUNNING 的
+    outputTools.filter((t) => t.status === 'RUNNING').forEach((t) => newExpanded.add(t.toolOrder));
+    // 展开最后一个 SUCCESS 的（如果没有 RUNNING 的话）
+    if (newExpanded.size === 0) {
+      const lastSuccess = [...outputTools].reverse().find((t) => t.status === 'SUCCESS');
+      if (lastSuccess) newExpanded.add(lastSuccess.toolOrder);
+    }
+    setExpandedCards(newExpanded);
+    // 自动切换到当前关注的阶段
+    const focusTool = outputTools.find((t) => t.status === 'RUNNING')
+      || [...outputTools].reverse().find((t) => t.status === 'SUCCESS');
+    if (focusTool) {
+      const step = STEP_DEFS.find((s) => s.tool === focusTool.toolType);
+      if (step) setActiveTab(step.key);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tools]);
@@ -441,8 +451,8 @@ export default function ProjectDetailPage() {
           </div>
         </div>
 
-        {/* Project Info */}
-        <div className="panel">
+        {/* Project Info — 全宽 */}
+        <div className="panel full">
           <div className="panel-head"><h2>项目信息</h2></div>
           <div className="panel-body">
             <div className="info-grid">
