@@ -67,7 +67,11 @@ public class PipelineController {
     @PostMapping("/{id}/run")
     public ResponseEntity<?> run(@PathVariable Long id, Authentication auth,
                                  @RequestBody(required = false) ProjectDto.PipelineRunRequest req) {
-        Long userId = (Long) auth.getPrincipal();
+        Object principal = auth.getPrincipal();
+        if (!(principal instanceof Long)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "未登录或 Token 已过期"));
+        }
+        Long userId = (Long) principal;
         teamService.requireProjectRole(id, userId, Role.EDITOR);
         Project project = projectRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "项目不存在"));
@@ -131,7 +135,11 @@ public class PipelineController {
     public ResponseEntity<?> updateToolOutput(@PathVariable Long id, @PathVariable Long execId,
                                               @RequestBody ProjectDto.ToolOutputUpdateRequest req,
                                               Authentication auth) {
-        Long userId = (Long) auth.getPrincipal();
+        Object principal = auth.getPrincipal();
+        if (!(principal instanceof Long)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "未登录或 Token 已过期"));
+        }
+        Long userId = (Long) principal;
         teamService.requireProjectRole(id, userId, Role.EDITOR);
 
         ToolExecution exec = toolExecutionRepository.findById(execId).orElse(null);
@@ -178,7 +186,11 @@ public class PipelineController {
     @PostMapping("/{id}/runs/{runId}/rerun")
     public ResponseEntity<?> rerunDownstream(@PathVariable Long id, @PathVariable Long runId,
                                              @RequestParam int fromOrder, Authentication auth) {
-        Long userId = (Long) auth.getPrincipal();
+        Object principal = auth.getPrincipal();
+        if (!(principal instanceof Long)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "未登录或 Token 已过期"));
+        }
+        Long userId = (Long) principal;
         teamService.requireProjectRole(id, userId, Role.EDITOR);
         Project project = projectRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "项目不存在"));
@@ -217,7 +229,11 @@ public class PipelineController {
     /** 查询流水线状态 */
     @GetMapping("/{id}/status")
     public ResponseEntity<?> status(@PathVariable Long id, Authentication auth) {
-        Long userId = (Long) auth.getPrincipal();
+        Object principal = auth.getPrincipal();
+        if (!(principal instanceof Long)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "未登录或 Token 已过期"));
+        }
+        Long userId = (Long) principal;
         teamService.requireProjectRole(id, userId, Role.VIEWER);
 
         PipelineRun run = pipelineRunRepository.findFirstByProjectIdOrderByIdDesc(id);
@@ -269,7 +285,11 @@ public class PipelineController {
     }
 
     private ResponseEntity<?> download(Long id, String type, Authentication auth) {
-        Long userId = (Long) auth.getPrincipal();
+        Object principal = auth.getPrincipal();
+        if (!(principal instanceof Long)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "未登录或 Token 已过期"));
+        }
+        Long userId = (Long) principal;
         teamService.requireProjectRole(id, userId, Role.VIEWER);
         Project project = projectRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "项目不存在"));

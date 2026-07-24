@@ -227,9 +227,14 @@
 .result-card { padding: 16px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: rgba(255, 255, 255, .02); margin-bottom: 10px; transition: border-color .2s ease; }
 .result-card:hover { border-color: var(--line-strong); }
 .result-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.result-card-head.clickable { cursor: pointer; user-select: none; }
+.result-card-head.clickable:hover h3 { color: var(--mint); }
 .result-card h3 { font-size: 14px; font-weight: 680; }
 .result-card p { font-size: 12px; color: var(--muted); line-height: 1.7; }
 .result-card-ops { display: flex; gap: 6px; flex-shrink: 0; }
+.result-card-body { padding-top: 4px; border-top: 1px solid var(--line); margin-top: 8px; }
+.collapse-arrow { display: inline-block; width: 16px; font-size: 11px; color: var(--muted); transition: transform .2s ease; }
+.result-card.expanded .collapse-arrow { color: var(--mint); }
 .mini-btn {
   display: inline-flex; align-items: center; gap: 4px; padding: 4px 9px;
   font-size: 11px; font-weight: 640; color: var(--muted); cursor: pointer;
@@ -582,7 +587,34 @@
   white-space: pre-wrap; word-break: break-word;
 }
 
-/* ===== 方案版本管理（P4-3）===== */
+/* ========== 中间产物：标签页 + 多列网格 + 折叠 ========== */
+.tab-row { display: flex; gap: 4px; margin-bottom: 16px; flex-wrap: wrap; }
+.tab-btn {
+  display: flex; align-items: center; gap: 6px; padding: 8px 14px;
+  font-size: 12px; font-weight: 640; color: var(--muted); cursor: pointer;
+  border: 1px solid var(--line); border-radius: 10px; background: rgba(255, 255, 255, .02);
+  transition: all .2s ease;
+}
+.tab-btn:hover { border-color: var(--line-strong); color: var(--text); }
+.tab-btn.active { color: var(--mint); border-color: var(--mint); background: rgba(146, 246, 190, .08); }
+.tab-btn.has-data .tab-dot {
+  display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--mint);
+}
+.tab-dot { display: none; }
+.step-icon-sm { width: 18px; height: 18px; display: grid; place-items: center; border-radius: 5px; flex-shrink: 0; }
+.step-icon-sm svg { width: 11px; height: 11px; }
+.step-icon-sm.mint { background: rgba(146, 246, 190, .15); color: var(--mint); }
+.step-icon-sm.cyan { background: rgba(94, 230, 225, .15); color: var(--cyan); }
+.step-icon-sm.amber { background: rgba(255, 200, 111, .15); color: var(--amber); }
+.step-icon-sm.purple { background: rgba(197, 167, 255, .15); color: var(--purple); }
+
+.result-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 12px; }
+.result-grid .result-card { margin-bottom: 0; }
+
+@media (max-width: 760px) {
+  .result-grid { grid-template-columns: 1fr; }
+  .tab-row { overflow-x: auto; flex-wrap: nowrap; }
+}
 .muted { color: var(--muted); font-size: 12px; }
 .link-btn { background: none; border: none; color: var(--cyan); cursor: pointer; font-size: 12px; padding: 6px 0; display: inline-block; }
 .link-btn:hover { text-decoration: underline; }

@@ -98,9 +98,28 @@ export default function ProjectDetailPage() {
   }, [projectId]);
 
   const handleRun = async () => {
-    // 打开运行配置弹窗（选择模型 + 知识库）
-    setRunConfigOpen(true);
-    loadRunOptions();
+    // 先加载配置，成功后再打开弹窗；加载失败给明确提示
+    try {
+      const [{ data: ps }, { data: kbs }] = await Promise.all([
+        llmApi.list(),
+        imaApi.listConfigs(),
+      ]);
+      const providers = ps || [];
+      const enabled = (kbs || []).filter((k: any) => k.enabled);
+      if (providers.length === 0) {
+        showToast('请先在「设置 → LLM 配置」中添加大模型 API Key', true);
+        return;
+      }
+      setProviders(providers);
+      setKbConfigs(enabled);
+      const def = providers.find((p: any) => p.isDefault);
+      setSelectedProvider(def ? def.id : (providers[0] ? providers[0].id : ''));
+      setSelectedKbs(enabled.map((k: any) => k.id));
+      setRunConfigOpen(true);
+    } catch (e: any) {
+      const msg = e.response?.data?.error || e.response?.status === 401 ? '登录已过期，请重新登录' : '加载运行配置失败，请确认已配置 LLM Provider 和 IMA 知识库';
+      showToast(msg, true);
+    }
   };
 
   // ===== 运行前配置（模型 + 知识库）=====
@@ -109,21 +128,6 @@ export default function ProjectDetailPage() {
   const [kbConfigs, setKbConfigs] = useState<any[]>([]);
   const [selectedProvider, setSelectedProvider] = useState<number | ''>('');
   const [selectedKbs, setSelectedKbs] = useState<number[]>([]);
-
-  const loadRunOptions = async () => {
-    try {
-      const [{ data: ps }, { data: kbs }] = await Promise.all([
-        llmApi.list(),
-        imaApi.listConfigs(),
-      ]);
-      setProviders(ps || []);
-      const enabled = (kbs || []).filter((k: any) => k.enabled);
-      setKbConfigs(enabled);
-      const def = (ps || []).find((p: any) => p.isDefault);
-      setSelectedProvider(def ? def.id : (ps && ps[0] ? ps[0].id : ''));
-      setSelectedKbs(enabled.map((k: any) => k.id));
-    } catch { /* ignore */ }
-  };
 
   const submitRun = async () => {
     setRunning(true);
@@ -212,7 +216,28 @@ export default function ProjectDetailPage() {
     }
   };
 
-  // ===== 按质检建议改进：从方案大纲节点重跑（大纲会吸收质检建议） =====
+  // ===== 中间产物折叠与标签页 =====
+  const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set());
+  const [activeTab, setActiveTab] = useState<string>('');
+  const toggleCard = (order: number) => {
+    setExpandedCards((prev) => {
+      const next = new Set(prev);
+      next.has(order) ? next.delete(order) : next.add(order);
+      return next;
+    });
+  };
+  // 产物首次加载时，默认展开最后一个（最新完成的）
+  useEffect(() => {
+    const outputTools = tools.filter((t) => t.output);
+    if (outputTools.length > 0 && expandedCards.size === 0) {
+      const last = outputTools[outputTools.length - 1];
+      setExpandedCards(new Set([last.toolOrder]));
+      // 自动切换到最后一个工具所在阶段
+      const lastStep = STEP_DEFS.find((s) => s.tool === last.toolType);
+      if (lastStep) setActiveTab(lastStep.key);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tools]);
   const handleImprove = async () => {
     const outline = tools.find((t) => t.toolType === 'SOLUTION_OUTLINE');
     if (!outline) { showToast('未找到方案大纲节点', true); return; }
@@ -416,8 +441,8 @@ export default function ProjectDetailPage() {
           </div>
         </div>
 
-        {/* Intermediate results */}
-        <div className="panel">
+        {/* Intermediate results — 全宽 + 标签页 + 折叠 */}
+        <div className="panel full">
           <div className="panel-head">
             <h2>中间产物</h2>
             {hasRun && <span className="badge badge-cyan">可编辑 / 重跑下游</span>}
@@ -426,23 +451,73 @@ export default function ProjectDetailPage() {
             {tools.length === 0 ? (
               <div className="empty-state"><p>运行流水线后，这里将展示各工具的分析结果</p></div>
             ) : (
-              tools.filter((t) => t.output).map((t) => (
-                <div className="result-card" key={t.toolOrder}>
-                  <div className="result-card-head">
-                    <h3>{t.status === 'SUCCESS' ? '✅ ' : t.status === 'FAILED' ? '⚠️ ' : '🔄 '}{TOOL_LABEL[t.toolType] || t.toolType}</h3>
-                    <div className="result-card-ops">
-                      <button className="mini-btn" title="编辑产物" onClick={() => openEdit(t)}><IconEdit width={13} height={13} /> 编辑</button>
-                      {!isLast(t.toolOrder) && (
-                        <button className="mini-btn" title="重跑该节点之后的下游" disabled={rerunning !== null}
-                          onClick={() => handleRerun(t)}>
-                          {rerunning === t.toolOrder ? <IconSync width={13} height={13} className="spin" /> : <IconSync width={13} height={13} />} 重跑下游
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  <ResultBody tool={t} onImprove={t.toolType === 'SOLUTION_QC' ? handleImprove : undefined} improving={rerunning !== null} />
+              <>
+                {/* 阶段标签页 */}
+                <div className="tab-row">
+                  {STEP_DEFS.map((s) => {
+                    const hasOutput = tools.some((t) => t.toolType === s.tool && t.output);
+                    return (
+                      <button
+                        key={s.key}
+                        className={`tab-btn ${activeTab === s.key ? 'active' : ''} ${hasOutput ? 'has-data' : ''}`}
+                        onClick={() => setActiveTab(s.key)}
+                      >
+                        <span className={`step-icon-sm ${s.color}`}>{s.icon}</span>
+                        <span>{s.key}</span>
+                        {hasOutput && <i className="tab-dot" />}
+                      </button>
+                    );
+                  })}
                 </div>
-              ))
+                {/* 当前标签页下的产物卡片（多列网格） */}
+                <div className="result-grid">
+                  {tools
+                    .filter((t) => {
+                      if (!t.output) return false;
+                      if (activeTab) {
+                        const step = STEP_DEFS.find((s) => s.tool === t.toolType);
+                        return step && step.key === activeTab;
+                      }
+                      return true;
+                    })
+                    .map((t) => {
+                      const isExpanded = expandedCards.has(t.toolOrder);
+                      return (
+                        <div className={`result-card ${isExpanded ? 'expanded' : ''}`} key={t.toolOrder}>
+                          <div
+                            className="result-card-head clickable"
+                            onClick={() => toggleCard(t.toolOrder)}
+                          >
+                            <h3>
+                              <span className="collapse-arrow">{isExpanded ? '▾' : '▸'}</span>
+                              {t.status === 'SUCCESS' ? '✅ ' : t.status === 'FAILED' ? '⚠️ ' : '🔄 '}
+                              {TOOL_LABEL[t.toolType] || t.toolType}
+                            </h3>
+                            <div className="result-card-ops" onClick={(e) => e.stopPropagation()}>
+                              <button className="mini-btn" title="编辑产物" onClick={() => openEdit(t)}><IconEdit width={13} height={13} /> 编辑</button>
+                              {!isLast(t.toolOrder) && (
+                                <button className="mini-btn" title="重跑该节点之后的下游" disabled={rerunning !== null}
+                                  onClick={() => handleRerun(t)}>
+                                  {rerunning === t.toolOrder ? <IconSync width={13} height={13} className="spin" /> : <IconSync width={13} height={13} />} 重跑下游
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                          {isExpanded && (
+                            <div className="result-card-body">
+                              <ResultBody tool={t} onImprove={t.toolType === 'SOLUTION_QC' ? handleImprove : undefined} improving={rerunning !== null} />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
+                {tools.filter((t) => t.output && (!activeTab || STEP_DEFS.some((s) => s.tool === t.toolType && s.key === activeTab))).length === 0 && activeTab && (
+                  <div className="empty-state compact" style={{ padding: '18px' }}>
+                    <p>该阶段暂无产物，请选择其他标签页查看</p>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
