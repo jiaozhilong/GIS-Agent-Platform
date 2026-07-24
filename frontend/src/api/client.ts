@@ -232,18 +232,18 @@ export const projectApi = {
   restoreVersion: (id: number, vid: number) =>
     apiClient.post(`/projects/${id}/versions/${vid}/restore`),
 
-  // 下载 Markdown
+  // 下载 Markdown（生成可能较慢，延长超时）
   downloadMd: (id: number) =>
-    apiClient.get(`/projects/${id}/download/md`, { responseType: 'blob' }),
+    apiClient.get(`/projects/${id}/download/md`, { responseType: 'blob', timeout: 120000 }),
 
   // 下载 Word
   downloadDocx: (id: number) =>
-    apiClient.get(`/projects/${id}/download/docx`, { responseType: 'blob' }),
+    apiClient.get(`/projects/${id}/download/docx`, { responseType: 'blob', timeout: 120000 }),
 
-  // 下载 PPT（支持指定模板 ID）
+  // 下载 PPT（支持指定模板 ID，生成需调用 Node 脚本，延长超时）
   downloadPptx: (id: number, templateId?: number) => {
     const params = templateId ? { templateId } : {};
-    return apiClient.get(`/projects/${id}/download/pptx`, { params, responseType: 'blob' });
+    return apiClient.get(`/projects/${id}/download/pptx`, { params, responseType: 'blob', timeout: 120000 });
   },
 
   // 上传 PPT 品牌模板（全局导出样式，保存为 ./data/templates/brand-template.pptx）

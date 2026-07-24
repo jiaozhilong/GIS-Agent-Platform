@@ -219,6 +219,16 @@
 .flow-step.done .step-icon { color: var(--mint); border-color: rgba(102, 239, 164, .35); background: rgba(102, 239, 164, .09); }
 .flow-step.active .step-icon { color: #092119; border-color: var(--mint); background: var(--mint); }
 .flow-step.active { color: var(--text); }
+.flow-step.running .step-icon { animation: pulse-border 1.5s ease-in-out infinite; }
+.flow-step.pending .step-icon { opacity: .6; border-style: dashed; }
+.flow-step.failed .step-icon { color: var(--danger); border-color: rgba(255, 140, 124, .4); background: rgba(255, 140, 124, .1); }
+.flow-step.failed { color: var(--danger); }
+.workflow-meta { display: flex; justify-content: space-between; align-items: center; padding: 12px 28px 4px; font-size: 12px; color: var(--muted); }
+.workflow-meta strong { color: var(--mint); font-size: 13px; }
+@keyframes pulse-border {
+  0%, 100% { border-color: var(--mint); box-shadow: 0 0 12px rgba(146, 246, 190, .25); }
+  50% { border-color: var(--cyan); box-shadow: 0 0 20px rgba(94, 230, 225, .5); }
+}
 .info-grid { display: grid; gap: 12px; }
 .info-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
 .info-row:last-child { border-bottom: none; }

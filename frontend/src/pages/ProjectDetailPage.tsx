@@ -190,7 +190,16 @@ export default function ProjectDetailPage() {
       downloadBlob(data, name);
       showToast('下载已开始');
     } catch (e: any) {
-      showToast(e.response?.data?.error || '下载失败', true);
+      // 详细错误提示：区分超时 / 后端错误 / 网络问题
+      let msg = '下载失败';
+      if (e.code === 'ECONNABORTED' || e.message?.includes('timeout')) {
+        msg = `${type.toUpperCase()} 生成超时，请稍后重试或直接到后端 export 目录查看已生成文件`;
+      } else if (e.response?.data?.error) {
+        msg = e.response.data.error;
+      } else if (e.response?.status) {
+        msg = `下载失败（HTTP ${e.response.status}）`;
+      }
+      showToast(msg, true);
     }
   };
 
@@ -296,6 +305,11 @@ export default function ProjectDetailPage() {
 
   // 工作流步骤状态
   const stepStates = STEP_DEFS.map((s) => {
+    // PPT_OUTPUT 不是流水线节点（下载时生成），状态跟随方案整体完成情况
+    if (s.tool === 'PPT_OUTPUT') {
+      const pptStatus = done ? 'SUCCESS' : failed ? 'FAILED' : (runStatus === 'NO_RUN' ? 'IDLE' : 'PENDING');
+      return { ...s, status: pptStatus };
+    }
     const t = tools.find((x) => x.toolType === s.tool);
     return { ...s, status: t?.status || (runStatus === 'NO_RUN' ? 'IDLE' : 'PENDING') };
   });
@@ -327,7 +341,7 @@ export default function ProjectDetailPage() {
             <IconPlay /> {running ? '生成中…' : '运行流水线'}
           </button>
           <button className="btn btn-secondary" onClick={() => navigate(`/projects/${projectId}/run`)}>
-            <IconEdit /> 监控
+            <IconEdit /> 独立监控页
           </button>
         </div>
       </div>
@@ -436,18 +450,29 @@ export default function ProjectDetailPage() {
       <div className="content-grid">
         {/* Workflow */}
         <div className="panel full">
-          <div className="panel-head"><h2>工作流状态</h2></div>
+          <div className="panel-head">
+            <h2>工作流状态</h2>
+            {running && <span className="badge badge-cyan"><IconSync width={12} height={12} className="spin" /> 生成中…</span>}
+            {done && <span className="badge badge-mint"><IconCheck width={12} height={12} /> 已生成</span>}
+            {failed && <span className="badge badge-danger">生成失败</span>}
+          </div>
           <div className="workflow-track">
             <span className="track-progress" style={{ width: trackWidth }} />
             {stepStates.map((s) => {
-              const cls = s.status === 'SUCCESS' ? 'done' : (s.status === 'RUNNING' || s.status === 'PENDING') ? 'active' : '';
+              const cls = s.status === 'SUCCESS' ? 'done' : s.status === 'RUNNING' ? 'active running' : (s.status === 'PENDING' || s.status === 'IDLE') ? 'pending' : 'failed';
               return (
                 <div key={s.key} className={`flow-step ${cls}`}>
-                  <span className={`step-icon ${s.color}`}>{s.icon}</span>
+                  <span className={`step-icon ${s.color}`}>
+                    {s.status === 'RUNNING' ? <IconSync className="spin" /> : s.status === 'FAILED' ? '✕' : s.icon}
+                  </span>
                   {s.key}
                 </div>
               );
             })}
+          </div>
+          <div className="workflow-meta">
+            <span>进度：<strong>{trackWidth}</strong></span>
+            {running && <span className="text-muted">每 3 秒自动刷新，实时查看各阶段</span>}
           </div>
         </div>
 
