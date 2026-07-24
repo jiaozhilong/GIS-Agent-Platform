@@ -1,7 +1,9 @@
 package com.gisagent.export;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.gisagent.entity.PptTemplate;
 import com.gisagent.pipeline.ToolContext;
+import com.gisagent.repository.PptTemplateRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,6 +21,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * 方案文档导出服务。
@@ -41,6 +44,12 @@ public class ExportService {
     /** 可选 PPT 品牌模板路径（由 UI 提供 .pptx，JIT 门禁产物） */
     @Value("${storage.pptx-template:}")
     private String pptxTemplatePath;
+
+    private final PptTemplateRepository pptTemplateRepository;
+
+    public ExportService(PptTemplateRepository pptTemplateRepository) {
+        this.pptTemplateRepository = pptTemplateRepository;
+    }
 
     @PostConstruct
     public void init() {
@@ -157,26 +166,59 @@ public class ExportService {
     }
 
     public String exportPptx(Long projectId, String projectName, ToolContext context) {
+        return exportPptx(projectId, projectName, context, null, null);
+    }
+
+    /**
+     * 导出 PPT，支持指定模板。
+     * @param templateId 模板 ID，为 null 时使用用户默认模板或内置风格
+     * @param userId 模板所属用户，为 null 时仅使用全局配置的模板路径
+     */
+    public String exportPptx(Long projectId, String projectName, ToolContext context, Long templateId, Long userId) {
         ensureDir();
         String fileName = String.format("%d_solution_%s.pptx", projectId, timestamp());
         Path path = Path.of(exportDir, fileName);
         Map<String, Object> data = new HashMap<>(context.toMap());
         data.put("projectName", projectName);
-        String tpl = resolvePptxTemplate();
+        String tpl = resolvePptxTemplate(templateId, userId);
         boolean ok = runNodeScript("generate-pptx.js", data, path, tpl);
         if (ok) return path.toString();
         throw new RuntimeException("PPTX 生成失败（Node 脚本执行异常，请确认 backend 已执行 npm install 且 node 可用）");
     }
 
-    /** 解析 PPT 品牌模板：优先配置路径，其次默认目录，均无则返回 null（使用脚本内置深蓝风格）。 */
-    private String resolvePptxTemplate() {
+    /** 解析 PPT 模板：优先按 templateId 查找，其次用户默认模板，再次全局配置，最后回退内置风格。 */
+    private String resolvePptxTemplate(Long templateId, Long userId) {
+        // 1) 指定了模板 ID → 直接查找
+        if (templateId != null && userId != null) {
+            Optional<PptTemplate> opt = pptTemplateRepository.findByIdAndUserId(templateId, userId);
+            if (opt.isPresent() && Files.exists(Path.of(opt.get().getFilePath()))) {
+                return opt.get().getFilePath();
+            }
+        }
+        // 2) 用户默认模板
+        if (userId != null) {
+            Optional<PptTemplate> opt = pptTemplateRepository.findByUserIdAndIsDefaultTrue(userId);
+            if (opt.isPresent() && Files.exists(Path.of(opt.get().getFilePath()))) {
+                return opt.get().getFilePath();
+            }
+            // 3) 用户任意一个模板
+            List<com.gisagent.entity.PptTemplate> all = pptTemplateRepository.findByUserIdOrderByCreatedAtDesc(userId);
+            for (PptTemplate t : all) {
+                if (Files.exists(Path.of(t.getFilePath()))) {
+                    return t.getFilePath();
+                }
+            }
+        }
+        // 4) 全局配置路径
         if (pptxTemplatePath != null && !pptxTemplatePath.isBlank() && Files.exists(Path.of(pptxTemplatePath))) {
             return pptxTemplatePath;
         }
+        // 5) 默认目录
         String defaultPath = "./data/templates/brand-template.pptx";
         if (Files.exists(Path.of(defaultPath))) {
             return defaultPath;
         }
+        // 6) 无模板，使用脚本内置深蓝风格
         return null;
     }
 

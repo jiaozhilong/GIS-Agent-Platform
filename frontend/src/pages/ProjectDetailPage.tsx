@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { projectApi, toolApi, downloadBlob, searchApi, llmApi, imaApi } from '../api/client';
+import { projectApi, toolApi, downloadBlob, searchApi, llmApi, imaApi, pptTemplateApi } from '../api/client';
 import { useToast } from '../components/ui/Toast';
 import { Modal } from '../components/ui/Modal';
 import VersionPanel from '../components/VersionPanel';
@@ -59,6 +59,19 @@ export default function ProjectDetailPage() {
   const [searching, setSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<any[] | null>(null);
 
+  // PPT 模板选择
+  const [pptTemplates, setPptTemplates] = useState<any[]>([]);
+  const [selectedPptTemplate, setSelectedPptTemplate] = useState<number | ''>('');
+  const loadPptTemplates = async () => {
+    try {
+      const { data } = await pptTemplateApi.list();
+      const list = data || [];
+      setPptTemplates(list);
+      const def = list.find((t: any) => t.isDefault);
+      if (def) setSelectedPptTemplate(def.id);
+    } catch { /* ignore */ }
+  };
+
   const loadOnce = async () => {
     try {
       const { data: d } = await projectApi.getById(projectId);
@@ -91,6 +104,7 @@ export default function ProjectDetailPage() {
     (async () => {
       await loadOnce();
       await poll();
+      loadPptTemplates();
       if (!cancelled) setLoading(false);
     })();
     return () => { cancelled = true; if (pollRef.current) window.clearInterval(pollRef.current); };
@@ -170,7 +184,7 @@ export default function ProjectDetailPage() {
     try {
       const { data } = type === 'md' ? await projectApi.downloadMd(projectId)
         : type === 'docx' ? await projectApi.downloadDocx(projectId)
-        : await projectApi.downloadPptx(projectId);
+        : await projectApi.downloadPptx(projectId, selectedPptTemplate === '' ? undefined : selectedPptTemplate as number);
       const ext = type === 'md' ? 'md' : type === 'docx' ? 'docx' : 'pptx';
       const name = `${(detail?.name || 'solution').replace(/\s+/g, '_')}.${ext}`;
       downloadBlob(data, name);
@@ -549,9 +563,29 @@ export default function ProjectDetailPage() {
               <button className="btn btn-secondary" onClick={() => handleDownload('md')} disabled={!done}>
                 <IconDownload /> 下载 Markdown (.md)
               </button>
-              <button className="btn btn-secondary" onClick={() => handleDownload('pptx')} disabled={!done}>
-                <IconDownload /> 下载 PPT (.pptx)
-              </button>
+              <div className="download-pptx-group">
+                <button className="btn btn-secondary" onClick={() => handleDownload('pptx')} disabled={!done}>
+                  <IconDownload /> 下载 PPT (.pptx)
+                </button>
+                {pptTemplates.length > 0 && (
+                  <select
+                    className="form-select ppt-template-select"
+                    value={selectedPptTemplate}
+                    onChange={(e) => setSelectedPptTemplate(e.target.value ? Number(e.target.value) : '')}
+                    disabled={!done}
+                  >
+                    <option value="">系统默认风格</option>
+                    {pptTemplates.map((t: any) => (
+                      <option key={t.id} value={t.id}>{t.name}{t.isDefault ? '（默认）' : ''}</option>
+                    ))}
+                  </select>
+                )}
+                {pptTemplates.length === 0 && (
+                  <a className="link-btn" onClick={() => navigate('/settings/ppt-templates')} style={{ fontSize: 11, marginLeft: 8 }}>
+                    上传模板
+                  </a>
+                )}
+              </div>
             </div>
           </div>
         </div>

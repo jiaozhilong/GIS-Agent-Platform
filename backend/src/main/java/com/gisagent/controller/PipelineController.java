@@ -280,11 +280,16 @@ public class PipelineController {
 
     /** 下载 PPT（Tool-9 方案输出，导出为后处理，与 MD/DOCX 一致） */
     @GetMapping("/{id}/download/pptx")
-    public ResponseEntity<?> downloadPptx(@PathVariable Long id, Authentication auth) {
-        return download(id, "PPTX", auth);
+    public ResponseEntity<?> downloadPptx(@PathVariable Long id, Authentication auth,
+                                          @RequestParam(required = false) Long templateId) {
+        return download(id, "PPTX", auth, templateId);
     }
 
     private ResponseEntity<?> download(Long id, String type, Authentication auth) {
+        return download(id, type, auth, null);
+    }
+
+    private ResponseEntity<?> download(Long id, String type, Authentication auth, Long pptTemplateId) {
         Object principal = auth.getPrincipal();
         if (!(principal instanceof Long)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "未登录或 Token 已过期"));
@@ -306,7 +311,7 @@ public class PipelineController {
             filePath = exportService.exportMarkdown(id, project.getName(), context);
             fileName = new File(filePath).getName();
         } else if ("PPTX".equals(type)) {
-            filePath = exportService.exportPptx(id, project.getName(), context);
+            filePath = exportService.exportPptx(id, project.getName(), context, pptTemplateId, userId);
             fileName = new File(filePath).getName();
         } else {
             filePath = exportService.exportDocx(id, project.getName(), context);

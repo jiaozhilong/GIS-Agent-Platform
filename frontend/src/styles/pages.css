@@ -266,7 +266,9 @@
 .doc-preview p { font-size: 13px; color: var(--muted); line-height: 1.8; }
 .doc-preview ul { padding-left: 18px; margin: 8px 0; }
 .doc-preview li { font-size: 13px; color: var(--muted); margin-bottom: 4px; }
-.download-bar { display: flex; gap: 10px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); flex-wrap: wrap; }
+.download-bar { display: flex; gap: 10px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); flex-wrap: wrap; align-items: center; }
+.download-pptx-group { display: flex; align-items: center; gap: 6px; }
+.ppt-template-select { width: auto; min-width: 150px; min-height: 36px; font-size: 12px; }
 
 @media (max-width: 1100px) { .content-grid { grid-template-columns: 1fr; } .project-hero { grid-template-columns: 1fr; } .workflow-track { overflow-x: auto; } }
 
@@ -714,3 +716,32 @@
 .chain-type { font-size: 10.5px; color: var(--muted-2); font-family: var(--mono, monospace); }
 .chain-arrow { color: var(--mint); font-size: 16px; margin: 0 2px; }
 .fallback-badge { font-size: 11px; color: var(--amber); border: 1px solid rgba(255, 210, 138, .4); background: rgba(255, 210, 138, .08); padding: 2px 10px; border-radius: 999px; }
+
+/* ===== PPT 模板管理页 ===== */
+.template-list { display: flex; flex-direction: column; gap: 10px; }
+.tpl-card {
+  display: flex; align-items: center; gap: 16px; padding: 14px 18px;
+  border: 1px solid var(--line); border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, .02); transition: border-color .2s ease;
+}
+.tpl-card:hover { border-color: var(--line-strong); }
+.tpl-card.default { border-color: rgba(146, 246, 190, .3); background: rgba(146, 246, 190, .04); }
+.tpl-card-preview {
+  width: 56px; height: 56px; flex-shrink: 0; display: grid; place-items: center;
+  border-radius: 12px; background: linear-gradient(135deg, rgba(146, 246, 190, .12), rgba(94, 230, 225, .08));
+  color: var(--mint); position: relative;
+}
+.tpl-card-preview svg { width: 28px; height: 28px; }
+.tpl-default-badge {
+  position: absolute; bottom: -4px; right: -6px; font-size: 9px; font-weight: 700;
+  padding: 2px 7px; border-radius: 999px; color: #062b22; background: var(--mint);
+}
+.tpl-card-body { flex: 1; min-width: 0; }
+.tpl-card-name { font-size: 14px; font-weight: 680; margin: 0 0 4px; }
+.tpl-card-desc { font-size: 12px; color: var(--muted); margin: 0 0 6px; line-height: 1.5; }
+.tpl-card-meta { display: flex; gap: 14px; font-size: 11px; color: var(--muted-2); }
+.tpl-card-ops { display: flex; gap: 6px; flex-shrink: 0; flex-wrap: wrap; }
+@media (max-width: 640px) {
+  .tpl-card { flex-direction: column; align-items: flex-start; }
+  .tpl-card-ops { width: 100%; justify-content: flex-end; }
+}

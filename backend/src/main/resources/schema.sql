@@ -404,3 +404,20 @@ CREATE TABLE IF NOT EXISTS skills (
 );
 CREATE INDEX IF NOT EXISTS idx_skills_owner ON skills(owner_id);
 CREATE INDEX IF NOT EXISTS idx_skills_tool ON skills(owner_id, tool_type);
+
+-- ============================================================
+-- PPT 模板管理（多模板上传 / 选择）
+-- ============================================================
+CREATE TABLE IF NOT EXISTS ppt_templates (
+    id          BIGSERIAL PRIMARY KEY,
+    user_id     BIGINT       NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name        VARCHAR(256) NOT NULL,
+    description VARCHAR(1024),
+    file_path   VARCHAR(1024) NOT NULL,
+    file_size   BIGINT       NOT NULL DEFAULT 0,
+    is_default  BOOLEAN      NOT NULL DEFAULT FALSE,
+    created_at  TIMESTAMP    NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_ppt_templates_user ON ppt_templates(user_id);
+CREATE INDEX IF NOT EXISTS idx_ppt_templates_default ON ppt_templates(user_id, is_default);

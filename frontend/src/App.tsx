@@ -21,6 +21,7 @@ import OrchestratePage from './pages/OrchestratePage';
 import UsersAdminPage from './pages/UsersAdminPage';
 import UserProfilePage from './pages/UserProfilePage';
 import AuditPage from './pages/AuditPage';
+import PptTemplatePage from './pages/PptTemplatePage';
 import { useAuthStore } from './stores/authStore';
 
 function PrivateRoute({ children }: { children: ReactNode }) {
@@ -51,6 +52,7 @@ function App() {
             <Route path="projects/:id/run" element={<PipelineRunPage />} />
             <Route path="settings/llm" element={<LlmConfigPage />} />
             <Route path="settings/ima" element={<ImaConfigPage />} />
+            <Route path="settings/ppt-templates" element={<PptTemplatePage />} />
             <Route path="settings/skills" element={<SkillsPage />} />
             <Route path="pipeline" element={<PipelinePage />} />
             <Route path="templates" element={<TemplatesPage />} />

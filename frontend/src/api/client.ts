@@ -240,9 +240,11 @@ export const projectApi = {
   downloadDocx: (id: number) =>
     apiClient.get(`/projects/${id}/download/docx`, { responseType: 'blob' }),
 
-  // 下载 PPT
-  downloadPptx: (id: number) =>
-    apiClient.get(`/projects/${id}/download/pptx`, { responseType: 'blob' }),
+  // 下载 PPT（支持指定模板 ID）
+  downloadPptx: (id: number, templateId?: number) => {
+    const params = templateId ? { templateId } : {};
+    return apiClient.get(`/projects/${id}/download/pptx`, { params, responseType: 'blob' });
+  },
 
   // 上传 PPT 品牌模板（全局导出样式，保存为 ./data/templates/brand-template.pptx）
   uploadPptTemplate: (file: File) => {
@@ -252,6 +254,24 @@ export const projectApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
+};
+
+// ===== PPT 模板管理 API =====
+export const pptTemplateApi = {
+  list: () => apiClient.get('/ppt-templates'),
+  upload: (file: File, name?: string, description?: string) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    if (name) fd.append('name', name);
+    if (description) fd.append('description', description);
+    return apiClient.post('/ppt-templates', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  update: (id: number, data: { name?: string; description?: string; isDefault?: boolean }) =>
+    apiClient.put(`/ppt-templates/${id}`, data),
+  setDefault: (id: number) => apiClient.put(`/ppt-templates/${id}/default`),
+  delete: (id: number) => apiClient.delete(`/ppt-templates/${id}`),
 };
 
 // ===== Tool Execution API（中间产物编辑）=====
